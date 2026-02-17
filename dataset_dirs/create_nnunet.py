@@ -192,6 +192,7 @@ if __name__ == "__main__":
             print(f'Directory {fn} already exists')
 
     file_ending = '.nii.gz'  # default
+    name_mappings = []  # (nnunet_path, original_path) for .txt output
 
     if input_format == 'modality':
         # Original logic: each folder has its own file list, copy with sequential naming
@@ -203,14 +204,16 @@ if __name__ == "__main__":
             imgs, file_ext = _filter_by_extensions(all_files)
             imgs.sort()
 
+            out_subfolder = fns_out[fns_in.index(fn)]
             for i, img in enumerate(imgs):
                 ext = _get_extension(img)
                 new_name = f'{append}_{(i+1+start_from):03d}_0000{ext}'
-                if fns_out[fns_in.index(fn)] == 'labelsTr' or fns_out[fns_in.index(fn)] == 'labelsTs':
+                if out_subfolder == 'labelsTr' or out_subfolder == 'labelsTs':
                     new_name = new_name.replace('_0000', '')
+                name_mappings.append((f'{out_subfolder}/{new_name}', f'{fn}/{img}'))
                 print(f'Copying {img} to {new_name}')
                 if img != new_name:
-                    shutil.copy(os.path.join(directory, fn, img), os.path.join(out_data_dir, fns_out[fns_in.index(fn)], new_name))
+                    shutil.copy(os.path.join(directory, fn, img), os.path.join(out_data_dir, out_subfolder, new_name))
             if fn == fns_in[0]:  # count from first (images) folder
                 num_training = len(imgs)
                 file_ending = file_ext
@@ -236,6 +239,8 @@ if __name__ == "__main__":
             idx = copy_count + start_from
             img_new = f'{append}_{idx:03d}_0000{ext}'
             label_new = f'{append}_{idx:03d}{ext}'
+            name_mappings.append((f'imagesTr/{img_new}', f'images/{img}'))
+            name_mappings.append((f'labelsTr/{label_new}', f'{fns_in[1]}/{label_name}'))
             print(f'Copying {img} to {img_new}')
             shutil.copy(os.path.join(images_dir, img), os.path.join(out_data_dir, 'imagesTr', img_new))
             print(f'Copying {label_name} to {label_new}')
@@ -256,3 +261,10 @@ if __name__ == "__main__":
         }
     # Save dataset.json
     save_json(dataset_json, os.path.join(out_data_dir, 'dataset.json'))
+
+    # Save name mapping (nnunet name -> original name)
+    mapping_path = os.path.join(out_data_dir, 'name_mapping.txt')
+    with open(mapping_path, 'w') as f:
+        f.write('# nnunet_name -> original_path\n')
+        for nnunet_path, original_path in name_mappings:
+            f.write(f'{nnunet_path} -> {original_path}\n')
