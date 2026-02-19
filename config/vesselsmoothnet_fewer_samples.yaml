@@ -65,9 +65,9 @@ TEST_CASES:
   - '0063_0001'
   - '0076_1001'
   - '0083_2002'
-  - '0100_0002'
-  - '0113_0003'
-  - '0121_0000'
+  # - '0100_0002' # No centerline
+  # - '0113_0003' # No centerline
+  # - '0121_0000'
   - '0134_0002'
   - '0157_0000'
   - '0183_1002'
@@ -77,6 +77,8 @@ TEST_CASES:
 
 # Which cases not to use in extraction
 BAD_CASES:
+  - '0100_0002' # No centerline
+  - '0113_0003' # No centerline
   - '0092_0001' # Aorta with weird dimensions
   - '0064_1001' # Aorta with additional vessels
   - '0065_1001' # Aorta with additional vessels
