@@ -5,6 +5,7 @@ import argparse
 import sys
 import random
 import os
+import numpy as np
 import pandas as pd
 
 from modules import vtk_functions as vf
@@ -178,6 +179,7 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
                                                  global_config)
 
                 sub = 0  # In the case of multiple samples at this point
+                fixed_extract_size = global_config.get('FIXED_EXTRACT_SIZE')
                 for sample in range(n_samples):
                     # Map each center and size to image data
                     center, size_r = centers[sample], sizes[sample]
@@ -187,12 +189,12 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
                                                 size_r, origin_im,
                                                 spacing_im, size_im,
                                                 global_config['CAPFREE_PROP'],
-                                                min_dim=global_config.get('MIN_DIM', 5))
-                    # if any dim is less than 5, skip
-                    # if np.any(size_extract < 5):
-                    #     print("Size extract too small, skipping")
-                    #     skipped += 1
-                    #     continue
+                                                min_dim=global_config.get('MIN_DIM', 5),
+                                                fixed_size=fixed_extract_size)
+                    # Skip when fixed extraction would go out of bounds
+                    if size_extract is None:
+                        skipped += 1
+                        continue
 
                     # Check if a surface cap is in volume
                     if global_config['CAPFREE']:
@@ -227,12 +229,16 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
                                      )
 
                                 if global_config['WRITE_SURFACE']:
+                                    surf_radius = (0.5 * np.linalg.norm(
+                                        np.array(size_extract) * np.array(spacing_im))
+                                        if fixed_extract_size else
+                                        size_r*rads[count]/2)
                                     (stats_surf, new_surf_box, new_surf_sphere
                                      ) = extract_surface(
                                          new_img,
                                          global_surface,
                                          center,
-                                         size_r*rads[count]/2)
+                                         surf_radius)
                                     num_out = len(stats_surf['OUTLETS'])
                                     # print(f"Outlets are: {num_out}")
                                     stats.update(stats_surf)
@@ -261,12 +267,15 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
                                 index_extract_list = index_extract.astype(int).tolist()
                                 size_extract_list = size_extract.astype(int).tolist()
                                 new_img = sf.extract_volume(reader_im, index_extract_list, size_extract_list)
+                                surf_radius_alt = (0.5 * np.linalg.norm(
+                                    np.array(size_extract) * np.array(spacing_im))
+                                    if fixed_extract_size else size_r*rads[count]/2)
                                 (stats_surf, new_surf_box, new_surf_sphere
                                  ) = extract_surface(
                                      new_img,
                                      global_surface,
                                      center,
-                                     size_r*rads[count]/2)
+                                     surf_radius_alt)
                                 num_out = len(stats_surf['OUTLETS'])
                                 # print(f"Outlets are: {num_out}")
                                 stats.update(stats_surf)

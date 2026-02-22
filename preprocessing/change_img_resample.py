@@ -2,7 +2,14 @@
 # start_time = time.time()
 
 import os
+import sys
 import glob
+
+# Add project root to path for module imports (when run as script)
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 from modules.pre_process import resample
 import SimpleITK as sitk
 
@@ -46,7 +53,8 @@ def resample_image(img_sitk, target_size=None, target_spacing=None, order=1):
 
 def resample_images_batch(data_folder, out_folder, input_format='.mha', 
                           target_size=None, target_spacing=None, order=1,
-                          testing_samples=None, skip_existing=True):
+                          testing_samples=None, skip_existing=True,
+                          output_pixel_type=None, folder_label=''):
     """
     Batch resample all images in a folder.
     
@@ -59,9 +67,10 @@ def resample_images_batch(data_folder, out_folder, input_format='.mha',
         order: Interpolation order (0=nearest, 1=linear, 2=bspline)
         testing_samples: Optional list of sample names to filter
         skip_existing: Skip processing if output file already exists
+        output_pixel_type: Optional sitk pixel type to cast before writing
     
     Returns:
-        List of processed image filenames
+        List of (filename, spacing_record) for processed images. spacing_record: {orig_spacing, new_spacing, orig_size, new_size}
     """
     if not os.path.exists(out_folder):
         os.makedirs(out_folder)
@@ -81,6 +90,7 @@ def resample_images_batch(data_folder, out_folder, input_format='.mha',
     logger.debug(f'Images to resample: {imgs}')
     
     processed = []
+    spacing_records = []
     
     for img in imgs:
         img_path = os.path.join(data_folder, img)
@@ -91,8 +101,9 @@ def resample_images_batch(data_folder, out_folder, input_format='.mha',
             logger.info(f'Image {img} already processed, skipping...')
             continue
         
-        # Read the image
         img_sitk = sitk.ReadImage(img_path)
+        orig_spacing = list(img_sitk.GetSpacing())
+        orig_size = list(img_sitk.GetSize())
         
         logger.debug(f'Image {img} read')
         logger.debug(f"Image {img} shape: {img_sitk.GetSize()}")
@@ -109,13 +120,19 @@ def resample_images_batch(data_folder, out_folder, input_format='.mha',
         logger.debug(f"Image {img} resampled shape: {img_sitk.GetSize()}")
         logger.debug(f"Image {img} resampled spacing: {img_sitk.GetSpacing()}")
         
-        # Write the image
+        if output_pixel_type:
+            img_sitk = sitk.Cast(img_sitk, output_pixel_type)
         sitk.WriteImage(img_sitk, img_out_path)
         logger.info(f'Image {img} resampled and saved to {img_out_path}')
         
+        spacing_records.append({
+            'file': img, 'folder': folder_label,
+            'orig_spacing': orig_spacing, 'new_spacing': list(img_sitk.GetSpacing()),
+            'orig_size': orig_size, 'new_size': list(img_sitk.GetSize())
+        })
         processed.append(img)
     
-    return processed
+    return processed, spacing_records
 
 
 if __name__=='__main__':
@@ -145,8 +162,8 @@ Examples:
     parser.add_argument('--output_dir', '--output-dir',
                        type=str,
                        default=None,
-                       help='Directory to write resampled images. '
-                            'Defaults to inferred from input_dir')
+                       help='Base directory for resampled output. '
+                            'Default: input_dir/resampled/ (writes images_resampled/ and truths_resampled/)')
     parser.add_argument('--input_format', '--input-format',
                        type=str,
                        default='.mha',
@@ -188,21 +205,61 @@ Examples:
     
     # Use command-line arguments (required or default)
     data_folder = args.input_dir or './data/images/'
-    out_folder = args.output_dir or data_folder.replace('images', 'images_resampled')
     
-    # Validate directories
+    # Validate root directory exists
     if not os.path.exists(data_folder):
         raise ValueError(f"Input directory not found: {data_folder}. "
                         f"Provide --input_dir argument.")
     
-    # Process batch
-    resample_images_batch(
-        data_folder=data_folder,
-        out_folder=out_folder,
-        input_format=args.input_format,
-        target_size=args.target_size,
-        target_spacing=args.target_spacing,
-        order=args.order,
-        testing_samples=args.testing_samples,
-        skip_existing=args.skip_existing
+    # Auto-detect images subfolder: if no matching files in data_folder, try data_folder/images
+    images_folder = data_folder
+    images_subdir = os.path.join(data_folder, 'images')
+    if os.path.isdir(images_subdir):
+        files_in_root = [f for f in os.listdir(data_folder) if f.endswith(args.input_format)]
+        files_in_images = [f for f in os.listdir(images_subdir) if f.endswith(args.input_format)]
+        if not files_in_root and files_in_images:
+            images_folder = images_subdir
+    
+    # Default: data_folder/resampled/images_resampled and data_folder/resampled/truths_resampled
+    resampled_base = args.output_dir or os.path.join(data_folder, 'resampled')
+    images_out_folder = os.path.join(resampled_base, 'images_resampled')
+    truths_out_folder = os.path.join(resampled_base, 'truths_resampled')
+    
+    all_spacing_records = []
+    
+    # Process main batch
+    _, records = resample_images_batch(
+        data_folder=images_folder, out_folder=images_out_folder,
+        input_format=args.input_format, target_size=args.target_size,
+        target_spacing=args.target_spacing, order=args.order,
+        testing_samples=args.testing_samples, skip_existing=args.skip_existing,
+        folder_label='images'
     )
+    all_spacing_records.extend(records)
+    
+    # Resample truths folder if it exists (use nearest-neighbor for label images)
+    truths_folder = os.path.join(data_folder, 'truths')
+    if os.path.isdir(truths_folder):
+        _, records = resample_images_batch(
+            data_folder=truths_folder, out_folder=truths_out_folder,
+            input_format=args.input_format, target_size=args.target_size,
+            target_spacing=args.target_spacing, order=0,
+            testing_samples=args.testing_samples, skip_existing=args.skip_existing,
+            output_pixel_type=sitk.sitkInt8, folder_label='truths'
+        )
+        all_spacing_records.extend(records)
+    
+    # Write spacing changes log
+    log_path = os.path.join(resampled_base, 'spacing_changes.txt')
+    with open(log_path, 'w') as f:
+        f.write("Resampling spacing changes\n")
+        f.write("========================\n")
+        if args.target_spacing:
+            f.write(f"Target spacing: {list(args.target_spacing)} mm\n")
+        else:
+            f.write(f"Target size: {list(args.target_size)}\n")
+        f.write("\n")
+        for r in all_spacing_records:
+            f.write(f"{r['folder']}/{r['file']}\n")
+            f.write(f"  original: spacing={r['orig_spacing']} size={r['orig_size']}\n")
+            f.write(f"  resampled: spacing={r['new_spacing']} size={r['new_size']}\n\n")

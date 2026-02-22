@@ -322,24 +322,45 @@ def rotate_volume_x_plane(sitk_img, point, angle, return_vecs=False, verbose=Fal
 
 
 def map_to_image(point, radius, size_volume, origin_im, spacing_im, size_im,
-                 prop=1, min_dim=5):
+                 prop=1, min_dim=5, fixed_size=None):
     """
     Function to map a point and radius to volume metrics
     args:
         point: point of volume center
         radius: radius at that point
         size_volume: multiple of radius equal the intended
-            volume size
+            volume size (ignored when fixed_size is set)
         origin_im: image origin
         spacing_im: image spacing
         prop: proportion of image to be counted for caps contraint
         min_dim: minimum number of voxels in each dimension
+        fixed_size: optional [nx, ny, nz] voxel dimensions. If set, extracts
+            always the same voxel size (and same physical size for same spacing)
     return:
         size_extract: number of voxels to extract in each dim
         index_extract: index for sitk volume extraction
         voi_min/max: boundaries of volume for caps constraint
+        Returns (None, None, None, None) when fixed_size is used and extraction
+        would go out of image bounds (caller should skip the sample)
     """
     ratio = 1/2  # how much can be outside volume
+
+    if fixed_size is not None:
+        fixed_size = np.array(fixed_size, dtype=np.float64)
+        size_extract = np.ceil(fixed_size).astype(np.int64)
+        # Center extraction on point (in physical coords -> voxel index)
+        center_voxel = (point - origin_im) / spacing_im
+        index_extract = np.rint(center_voxel - size_extract / 2.0).astype(np.int64)
+        physical_half = (size_extract * spacing_im) / 2.0
+        voi_min = point - physical_half * prop
+        voi_max = point + physical_half * prop
+
+        # With fixed size, skip if extraction would go out of bounds
+        end_bounds = index_extract + size_extract
+        if np.any(index_extract < 0) or np.any(end_bounds > size_im):
+            return None, None, None, None
+
+        return size_extract.astype(np.float64), index_extract.astype(np.float64), voi_min, voi_max
 
     size_extract = np.ceil(size_volume*radius/spacing_im)
     # if size_extract is smaller than min_dim, set to min_dim

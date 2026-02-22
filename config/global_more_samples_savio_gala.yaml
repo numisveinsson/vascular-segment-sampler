@@ -17,6 +17,7 @@ ROTATE_VOLUMES: False
 
 RESAMPLE_VOLUMES: False
 RESAMPLE_SIZE: [64, 64, 64]
+# FIXED_EXTRACT_SIZE: [64, 64, 64]  # Optional: extract always same voxel size (and same physical size for same spacing). Uncomment to enable; omit for radius-based variable extraction.
 
 AUGMENT_VOLUMES: False
 

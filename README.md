@@ -80,6 +80,7 @@ The main configuration file is `config/global.yaml`. This file contains settings
 - `ROTATE_VOLUMES`: Rotate volumes during processing
 - `RESAMPLE_VOLUMES`: Resample volumes
 - `RESAMPLE_SIZE`: Target size for resampling
+- `FIXED_EXTRACT_SIZE`: Optional `[nx, ny, nz]` voxel dimensions. When set, extracts always the same voxel size (and same physical size for same spacing). Omit for radius-based variable extraction.
 - `WRITE_SAMPLES`: Write sample data
 - `WRITE_IMG`: Write image files
 - `WRITE_SURFACE`: Write surface meshes

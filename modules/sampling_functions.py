@@ -667,11 +667,11 @@ def extract_subvolumes(reader_im, reader_seg, index_extract, size_extract,
     seed = np.rint(np.array(size_extract)/2).astype(int).tolist()
     removed_seg_bin = remove_other_vessels(new_seg_bin, seed)
     # labels, means, _ = connected_comp_info(removed_seg, True)
-    # mask seg with removed seg
+    # mask seg with removed seg (cast mask to UInt8 to avoid MaskImageFilter deprecation warning)
     if binarize:
         removed_seg = removed_seg_bin
     else:
-        removed_seg = sitk.Mask(new_seg, removed_seg_bin)
+        removed_seg = sitk.Mask(new_seg, sitk.Cast(removed_seg_bin, sitk.sitkUInt8))
 
     rem_np = sitk.GetArrayFromImage(removed_seg)
     blood_np = im_np[seg_np > 0.1]

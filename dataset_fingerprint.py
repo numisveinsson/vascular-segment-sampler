@@ -17,7 +17,7 @@ from datetime import datetime
 from tqdm import tqdm
 
 
-def get_base_names(folder, extensions=['.mha', '.nii.gz', '.nii', '.vti', '.vtp', '.stl']):
+def get_base_names(folder, extensions=['.mha', '.nii.gz', '.nii', '.nrrd', '.vti', '.vtp', '.stl']):
     """Get base filenames without extensions from a folder."""
     if not os.path.exists(folder):
         return set()
@@ -355,7 +355,7 @@ def check_file_type_mismatches(base_folder):
     if os.path.exists(images_folder):
         image_files = glob.glob(os.path.join(images_folder, '*'))
         # Filter to common image extensions
-        image_extensions = ['.mha', '.nii.gz', '.nii', '.vti', '.vtk']
+        image_extensions = ['.mha', '.nii.gz', '.nii', '.nrrd', '.vti', '.vtk']
         image_files = [f for f in image_files if any(f.endswith(ext) for ext in image_extensions)]
         
         for img_file in tqdm(image_files, desc="Checking images folder for masks", leave=False):
@@ -369,7 +369,7 @@ def check_file_type_mismatches(base_folder):
     if os.path.exists(truths_folder):
         truth_files = glob.glob(os.path.join(truths_folder, '*'))
         # Filter to common image extensions
-        truth_extensions = ['.mha', '.nii.gz', '.nii', '.vti', '.vtk']
+        truth_extensions = ['.mha', '.nii.gz', '.nii', '.nrrd', '.vti', '.vtk']
         truth_files = [f for f in truth_files if any(f.endswith(ext) for ext in truth_extensions)]
         
         for truth_file in tqdm(truth_files, desc="Checking truths folder for images", leave=False):

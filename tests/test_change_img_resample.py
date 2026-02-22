@@ -178,7 +178,7 @@ class TestResampleImagesBatch(unittest.TestCase):
         """Test batch resampling to target spacing."""
         target_spacing = [2.0, 2.0, 2.0]
         
-        processed = resample_images_batch(
+        processed, _ = resample_images_batch(
             self.input_dir,
             self.output_dir,
             input_format='.mha',
@@ -202,7 +202,7 @@ class TestResampleImagesBatch(unittest.TestCase):
         """Test batch resampling to target size."""
         target_size = [10, 10, 10]
         
-        processed = resample_images_batch(
+        processed, _ = resample_images_batch(
             self.input_dir,
             self.output_dir,
             input_format='.mha',
@@ -223,7 +223,7 @@ class TestResampleImagesBatch(unittest.TestCase):
         target_spacing = [2.0, 2.0, 2.0]
         
         # First run
-        processed1 = resample_images_batch(
+        processed1, _ = resample_images_batch(
             self.input_dir,
             self.output_dir,
             target_spacing=target_spacing,
@@ -233,7 +233,7 @@ class TestResampleImagesBatch(unittest.TestCase):
         self.assertEqual(len(processed1), 3)
         
         # Second run should skip all files
-        processed2 = resample_images_batch(
+        processed2, _ = resample_images_batch(
             self.input_dir,
             self.output_dir,
             target_spacing=target_spacing,
@@ -247,14 +247,14 @@ class TestResampleImagesBatch(unittest.TestCase):
         target_spacing = [2.0, 2.0, 2.0]
         
         # First run
-        processed1 = resample_images_batch(
+        processed1, _ = resample_images_batch(
             self.input_dir,
             self.output_dir,
             target_spacing=target_spacing
         )
         
         # Second run with skip_existing=False should process all
-        processed2 = resample_images_batch(
+        processed2, _ = resample_images_batch(
             self.input_dir,
             self.output_dir,
             target_spacing=target_spacing,
@@ -268,7 +268,7 @@ class TestResampleImagesBatch(unittest.TestCase):
         target_spacing = [2.0, 2.0, 2.0]
         testing_samples = ['test_0', 'test_2']
         
-        processed = resample_images_batch(
+        processed, _ = resample_images_batch(
             self.input_dir,
             self.output_dir,
             target_spacing=target_spacing,
@@ -298,7 +298,7 @@ class TestResampleImagesBatch(unittest.TestCase):
         empty_dir = os.path.join(self.temp_dir, 'empty')
         os.makedirs(empty_dir)
         
-        processed = resample_images_batch(
+        processed, _ = resample_images_batch(
             empty_dir,
             self.output_dir,
             target_spacing=[2.0, 2.0, 2.0]
@@ -315,7 +315,7 @@ class TestResampleImagesBatch(unittest.TestCase):
         sitk.WriteImage(img, nii_path)
         
         # Process only .nii.gz files
-        processed = resample_images_batch(
+        processed, _ = resample_images_batch(
             self.input_dir,
             self.output_dir,
             input_format='.nii.gz',
