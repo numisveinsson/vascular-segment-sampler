@@ -5,13 +5,13 @@ from vtk.util.numpy_support import vtk_to_numpy
 import sys
 import os
 
-# Add modules directory to path
-modules_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'modules')
-if modules_path not in sys.path:
-    sys.path.insert(0, modules_path)
+# Add project root to path so "from modules import ..." works
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-import vtk_functions as vf
-import sitk_functions as sf
+from modules import vtk_functions as vf
+from modules import sitk_functions as sf
 
 
 def create_seg_from_surface(surface, image):
@@ -150,8 +150,8 @@ Examples:
     
     for img in imgs:
         # Check for both .vtp and .stl surface files
-        surf_path_vtp = dir_surfaces + img.replace(img_ext, '.vtp')
-        surf_path_stl = dir_surfaces + img.replace(img_ext, '.stl')
+        surf_path_vtp = os.path.join(dir_surfaces, img.replace(img_ext, '.vtp'))
+        surf_path_stl = os.path.join(dir_surfaces, img.replace(img_ext, '.stl'))
         
         # Determine which surface file exists
         if os.path.exists(surf_path_vtp):
@@ -162,7 +162,7 @@ Examples:
             logger.warning(f"Skipping case {img}: No surface file (.vtp or .stl) found")
             continue
         
-        output_path = out_dir + img.replace(img_ext, output_ext)
+        output_path = os.path.join(out_dir, img.replace(img_ext, output_ext))
 
         # Check if output file already exists
         if os.path.exists(output_path):
@@ -178,7 +178,7 @@ Examples:
         else:  # .vtp file
             surf_vtp = vf.read_geo(surf_path).GetOutput()
         
-        img_sitk = sitk.ReadImage(dir_imgs+img)
+        img_sitk = sitk.ReadImage(os.path.join(dir_imgs, img))
         img_vtk = vf.exportSitk2VTK(img_sitk)[0]
         # img_vtk = vf.read_img(dir_imgs+img).GetOutput()
         # seg = vf.convertPolyDataToImageData(surf_vtp, img_vtk)

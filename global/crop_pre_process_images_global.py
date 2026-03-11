@@ -113,8 +113,8 @@ def crop_bounds(im_read, seg_read, bounds):
 
 def create_crop_dir(out_dir):
     name = 'cropped'
-    img_dir = out_dir+name+'/'
-    seg_dir = out_dir+name+'_masks/'
+    img_dir = os.path.join(out_dir, name)
+    seg_dir = os.path.join(out_dir, name+'_masks')
     try:
         os.mkdir(img_dir)
     except Exception as e: print(e)
@@ -145,28 +145,28 @@ if __name__=='__main__':
 
     if not specific_folder:
         cases_dir = config['CASES_DIR']
-        centerlines = open(cases_dir+'/centerlines.txt')
+        centerlines = open(os.path.join(cases_dir, 'centerlines.txt'))
         centerlines = [f.replace('\n','') for f in centerlines]
         centerlines = ['/centerlines/'+f for f in centerlines]
 
-        images = open(cases_dir+'/images.txt').readlines()
+        images = open(os.path.join(cases_dir, 'images.txt')).readlines()
         images = [f.replace('\n','') for f in images]
         images = ['/images'+f for f in images]
 
-        segs = open(cases_dir+'/truths.txt').readlines()
+        segs = open(os.path.join(cases_dir, 'truths.txt')).readlines()
         segs = [f.replace('\n','') for f in segs]
         segs = ['/images'+f for f in segs]
 
-        modality = open(cases_dir+'/modality.txt')
+        modality = open(os.path.join(cases_dir, 'modality.txt'))
         modality  = [f.replace('\n','') for f in modality]
 
     else:
-        images = os.listdir(cases_prefix+'images/')
+        images = os.listdir(os.path.join(cases_prefix, 'images'))
         images = [image for image in images if '.vtk' in image]
         images = ['images/'+image for image in images]
-        centerlines = os.listdir(cases_prefix+'centerlines/')
+        centerlines = os.listdir(os.path.join(cases_prefix, 'centerlines'))
         centerlines = ['/centerlines/'+f for f in centerlines]
-        modality = open(cases_prefix+'/modality.txt')
+        modality = open(os.path.join(cases_prefix, 'modality.txt'))
         modality  = [f.replace('\n','') for f in modality]
         #segs = os.listdir(cases_prefix+'truths/')
 
@@ -178,35 +178,35 @@ if __name__=='__main__':
         mod = modality[i].lower()
         if global_scale:
             if crop:
-                img_reader, img_np = sf.read_image_numpy(cases_prefix+image)
+                img_reader, img_np = sf.read_image_numpy(os.path.join(cases_prefix, image))
                 img_new_np = rescale_intensity(img_np, mod, [750, -750])
                 img_new = sf.create_new_from_numpy(img_reader, img_new_np)
-                sf.write_image(img_new, img_dir+centerlines[i][-13:-4]+'.vtk')
+                sf.write_image(img_new, os.path.join(img_dir, centerlines[i][-13:-4]+'.vtk'))
 
-                _, np_seg = sf.read_image_numpy(cases_prefix+segs[i])
+                _, np_seg = sf.read_image_numpy(os.path.join(cases_prefix, segs[i]))
                 new_bounds = define_bounds(np_seg, dims, add_padding, template_size)
 
-                im_read = sf.read_image(img_dir+centerlines[i][-13:-4]+'.vtk')
-                seg_read = sf.read_image(cases_prefix+segs[i])
+                im_read = sf.read_image(os.path.join(img_dir, centerlines[i][-13:-4]+'.vtk'))
+                seg_read = sf.read_image(os.path.join(cases_prefix, segs[i]))
                 new_img, new_seg = crop_bounds(im_read, seg_read, new_bounds)
 
-                sf.write_image(new_img, img_dir+centerlines[i][-13:-4]+'.vtk')
-                sf.write_image(new_seg, seg_dir+centerlines[i][-13:-4]+'.vtk')
+                sf.write_image(new_img, os.path.join(img_dir, centerlines[i][-13:-4]+'.vtk'))
+                sf.write_image(new_seg, os.path.join(seg_dir, centerlines[i][-13:-4]+'.vtk'))
             else:
-                img_reader, img_np = sf.read_image_numpy(cases_prefix+image)
+                img_reader, img_np = sf.read_image_numpy(os.path.join(cases_prefix, image))
                 img_new_np = rescale_intensity(img_np, mod, [750, -750])
                 img_new = sf.create_new_from_numpy(img_reader, img_new_np)
-                sf.write_image(img_new, out_dir+image.replace('images/',''))
+                sf.write_image(img_new, os.path.join(out_dir, image.replace('images/', '')))
             #print(f"Mean value: {img_new_np.mean()}")
         else:
             if crop:
-                _, np_seg = sf.read_image_numpy(cases_prefix+segs[i])
+                _, np_seg = sf.read_image_numpy(os.path.join(cases_prefix, segs[i]))
                 new_bounds = define_bounds(np_seg, dims, add_padding, template_size)
-                new_img, new_seg = crop_bounds(cases_prefix+image, cases_prefix+segs[i], new_bounds)
-                sf.write_image(new_img, img_dir+centerlines[i][-13:-4]+'.vtk')
-                sf.write_image(new_seg, seg_dir+centerlines[i][-13:-4]+'.vtk')
+                new_img, new_seg = crop_bounds(os.path.join(cases_prefix, image), os.path.join(cases_prefix, segs[i]), new_bounds)
+                sf.write_image(new_img, os.path.join(img_dir, centerlines[i][-13:-4]+'.vtk'))
+                sf.write_image(new_seg, os.path.join(seg_dir, centerlines[i][-13:-4]+'.vtk'))
             else:
-                img = sf.read_image(cases_prefix+image)
-                sf.write_image(img, out_dir+image.replace('images/',''))
+                img = sf.read_image(os.path.join(cases_prefix, image))
+                sf.write_image(img, os.path.join(out_dir, image.replace('images/', '')))
 
     pdb.set_trace()

@@ -5,13 +5,13 @@ from vtk.util.numpy_support import vtk_to_numpy
 import sys
 import os
 
-# Add modules directory to path
-modules_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'modules')
-if modules_path not in sys.path:
-    sys.path.insert(0, modules_path)
+# Add project root to path so "from modules import ..." works
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-import vtk_functions as vf
-import sitk_functions as sf
+from modules import vtk_functions as vf
+from modules import sitk_functions as sf
 
 
 def rotate_mesh(mesh, vtkLabel, center=None):
@@ -80,6 +80,9 @@ if __name__ == '__main__':
 Examples:
   python create_surf_from_seg.py --segmentations_dir /path/to/segmentations --output_dir /path/to/output
   
+  # Extract only specific mask labels (e.g. aorta=1, vena cava=2):
+  python create_surf_from_seg.py --masks 1,2
+  
   # Using default directory:
   python create_surf_from_seg.py
         """
@@ -118,6 +121,11 @@ Examples:
                        type=str,
                        default='.vtp',
                        help='Output surface file extension (default: .vtp)')
+    parser.add_argument('--masks', '--mask',
+                       type=str,
+                       default=None,
+                       help='Comma-separated list of label values to extract (e.g. "1" or "1,2,3"). '
+                            'If not specified, extracts surfaces for all non-zero labels.')
     
     args = parser.parse_args()
     
@@ -128,6 +136,13 @@ Examples:
     spacing_file = args.spacing_file
     if if_spacing_file and not spacing_file:
         raise ValueError("--spacing_file argument must be set when using spacing file")
+    
+    # Mask option: which labels to extract (None = all non-zero)
+    mask_labels = None
+    if args.masks is not None:
+        mask_labels = [int(x.strip()) for x in args.masks.split(',') if x.strip()]
+        if not mask_labels:
+            raise ValueError("--masks must specify at least one label value")
     
     # Filter option: only process images containing this string
     filter_string = args.filter_string or ''
@@ -189,16 +204,27 @@ Examples:
     for img in imgs:
         logger.info(f"Starting case: {img}")
         # Load segmentation
-        seg = sitk.ReadImage(dir_segmentations+img)
+        seg = sitk.ReadImage(os.path.join(dir_segmentations, img))
         origin = seg.GetOrigin()
 
         if if_spacing_file:
             # set the spacing
             seg.SetSpacing(spacing_values[imgs.index(img)])
-            sitk.WriteImage(seg, out_dir+img.replace(img_ext, img_ext_out))
+            sitk.WriteImage(seg, os.path.join(out_dir, img.replace(img_ext, img_ext_out)))
 
         logger.debug(f"Image size: {seg.GetSize()}")
         logger.debug(f"Image spacing: {seg.GetSpacing()}")
+        
+        # Optionally filter to specific mask labels
+        if mask_labels is not None:
+            seg_arr = sitk.GetArrayFromImage(seg)
+            mask = np.isin(seg_arr, mask_labels)
+            seg_arr_filtered = np.where(mask, seg_arr, 0)
+            seg_filtered = sitk.GetImageFromArray(seg_arr_filtered)
+            seg_filtered.CopyInformation(seg)
+            seg = seg_filtered
+            logger.debug(f"Extracting masks: {mask_labels}")
+        
         # Create surfaces
         # poly = sf.convert_seg_to_surfs(seg, new_spacing=[.5,.5,.5], target_node_num=1e5, bound=False)
         poly = vf.vtk_marching_cube_multi(vf.exportSitk2VTK(seg)[0], 0, rotate=False, center=origin)
@@ -211,6 +237,6 @@ Examples:
             # smooth the surface
             poly = vf.smooth_polydata(poly, iteration=50)
         # Write surfaces
-        vf.write_geo(out_dir+img.replace(img_ext, '.vtp'), poly)
+        vf.write_geo(os.path.join(out_dir, img.replace(img_ext, '.vtp')), poly)
         logger.info(f"Finished case: {img}")
     logger.info("All done.")

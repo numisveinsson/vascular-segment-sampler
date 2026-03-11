@@ -2,6 +2,7 @@ from gather_sampling_data import define_cases, create_directories, extract_subvo
 from move_validation import random_files, move_files
 from modules import sitk_functions as sf
 from modules import io
+import os
 import SimpleITK as sitk
 import numpy as np
 import csv
@@ -73,13 +74,13 @@ if __name__=='__main__':
         info_file_name = "info"+'_'+modality+dt_string+".txt"
         print_info_file(global_config, cases, test_samples, info_file_name)
 
-        image_out_dir_train = out_dir+modality+'_train/'
-        seg_out_dir_train = out_dir+modality+'_train_masks/'
-        image_out_dir_val = out_dir+modality+'_val/'
-        seg_out_dir_val = out_dir+modality+'_val_masks/'
+        image_out_dir_train = os.path.join(out_dir, modality+'_train')
+        seg_out_dir_train = os.path.join(out_dir, modality+'_train_masks')
+        image_out_dir_val = os.path.join(out_dir, modality+'_val')
+        seg_out_dir_val = os.path.join(out_dir, modality+'_val_masks')
 
-        image_out_dir_test = out_dir+modality+'_test/'
-        seg_out_dir_test = out_dir+modality+'_test_masks/'
+        image_out_dir_test = os.path.join(out_dir, modality+'_test')
+        seg_out_dir_test = os.path.join(out_dir, modality+'_test_masks')
 
         if trace_testing:
             image_out_dir = image_out_dir_test
@@ -122,11 +123,11 @@ if __name__=='__main__':
                     stats.update({"NUM_VOX": size_extract[0]*size_extract[1]*size_extract[2]})
 
                     if write_samples:
-                        sitk.WriteImage(new_img, image_out_dir + case_dict['NAME'] +'_'+str(i)+'.nii.gz')
-                        sitk.WriteImage(removed_seg, seg_out_dir + case_dict['NAME'] +'_'+str(i)+'.nii.gz')
+                        sitk.WriteImage(new_img, os.path.join(image_out_dir, case_dict['NAME']+'_'+str(i)+'.nii.gz'))
+                        sitk.WriteImage(removed_seg, os.path.join(seg_out_dir, case_dict['NAME']+'_'+str(i)+'.nii.gz'))
                     if write_vtk_samples:
-                        sitk.WriteImage(new_img, out_dir+'vtk_data/vtk_' + case_dict['NAME']+'_'+str(i)+'.vtk')
-                        sitk.WriteImage(removed_seg*255, out_dir+'vtk_data/vtk_mask_'+ case_dict['NAME']+'_'+str(i)+'.vtk')
+                        sitk.WriteImage(new_img, os.path.join(out_dir, 'vtk_data', 'vtk_'+case_dict['NAME']+'_'+str(i)+'.vtk'))
+                        sitk.WriteImage(removed_seg*255, os.path.join(out_dir, 'vtk_data', 'vtk_mask_'+case_dict['NAME']+'_'+str(i)+'.vtk'))
 
                     csv_list.append(stats)
                     N += 1
@@ -139,8 +140,8 @@ if __name__=='__main__':
                     stats = {"No":N, "NAME": case_dict['NAME']+'_'+str(i), "RESOLUTION": size_extract,"ORIGIN": origin_im, "SPACING": spacing_im,}
                 stats.update({"NUM_VOX": size_extract[0]*size_extract[1]*size_extract[2]})
                 if write_samples:
-                    sitk.WriteImage(new_img, image_out_dir + case_dict['NAME']+'.nii.gz')
-                    sitk.WriteImage(removed_seg, seg_out_dir + case_dict['NAME'] +'.nii.gz')
+                    sitk.WriteImage(new_img, os.path.join(image_out_dir, case_dict['NAME']+'.nii.gz'))
+                    sitk.WriteImage(removed_seg, os.path.join(seg_out_dir, case_dict['NAME']+'.nii.gz'))
                 csv_list.append(stats)
 
             print(f"\n Finished: ' {case_dict['NAME']}, {size_im}")
@@ -152,7 +153,7 @@ if __name__=='__main__':
         csv_columns = ["No", "NAME", "SIZE","RESOLUTION", "ORIGIN", "SPACING", "POINT_CENT", "INDEX", "SIZE_EXTRACT", "VOL_CENT", "DIFF_CENT", "IM_MEAN",
         "IM_STD","IM_MAX","IM_MIN","BLOOD_MEAN","BLOOD_STD","BLOOD_MAX","BLOOD_MIN","GT_MEAN", "GT_STD", "GT_MAX", "GT_MIN",
         "LARGEST_MEAN","LARGEST_STD","LARGEST_MAX","LARGEST_MIN", 'RADIUS', 'TANGENTX', 'TANGENTY', 'TANGENTZ', 'BIFURCATION', 'NUM_VOX']
-        with open(out_dir+modality+csv_file, 'w') as csvfile:
+        with open(os.path.join(out_dir, modality+csv_file), 'w') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=csv_columns)
             writer.writeheader()
             for data in csv_list:

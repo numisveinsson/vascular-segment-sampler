@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import argparse
+import os
 import random
 import SimpleITK as sitk
 import sys
@@ -77,13 +78,13 @@ if __name__ == '__main__':
 
         create_directories(out_dir, modality, global_config)
 
-        image_out_dir_train = out_dir+modality+'_train/'
-        seg_out_dir_train = out_dir+modality+'_train_masks/'
-        image_out_dir_val = out_dir+modality+'_val/'
-        seg_out_dir_val = out_dir+modality+'_val_masks/'
+        image_out_dir_train = os.path.join(out_dir, modality+'_train')
+        seg_out_dir_train = os.path.join(out_dir, modality+'_train_masks')
+        image_out_dir_val = os.path.join(out_dir, modality+'_val')
+        seg_out_dir_val = os.path.join(out_dir, modality+'_val_masks')
 
-        image_out_dir_test = out_dir+modality+'_test/'
-        seg_out_dir_test = out_dir+modality+'_test_masks/'
+        image_out_dir_test = os.path.join(out_dir, modality+'_test')
+        seg_out_dir_test = os.path.join(out_dir, modality+'_test_masks')
 
         # cases = Dataset.sort_cases(testing, global_config['TEST_CASES'])
         # cases = Dataset.check_which_cases_in_image_dir(cases)
@@ -140,12 +141,12 @@ if __name__ == '__main__':
                 seg = sitk.Cast(seg, sitk.sitkUInt8)
 
             if global_config['WRITE_SAMPLES']:
-                sitk.WriteImage(img, image_out_dir + case_dict['NAME'] +'.nii.gz')
+                sitk.WriteImage(img, os.path.join(image_out_dir, case_dict['NAME']+'.nii.gz'))
                 if seg is not None:
-                    sitk.WriteImage(seg, seg_out_dir + case_dict['NAME'] +'.nii.gz')
+                    sitk.WriteImage(seg, os.path.join(seg_out_dir, case_dict['NAME']+'.nii.gz'))
             if global_config['WRITE_VTK']:
-                sitk.WriteImage(img, out_dir+'vtk_data/vtk_' + case_dict['NAME']+'.mha')
+                sitk.WriteImage(img, os.path.join(out_dir, 'vtk_data', 'vtk_'+case_dict['NAME']+'.mha'))
                 if seg is not None:
-                    sitk.WriteImage(seg*255, out_dir+'vtk_data/vtk_mask_'+ case_dict['NAME']+'.mha')
+                    sitk.WriteImage(seg*255, os.path.join(out_dir, 'vtk_data', 'vtk_mask_'+case_dict['NAME']+'.mha'))
 
             print(f"\n Finished: ' {case_dict['NAME']}, {size_im}")

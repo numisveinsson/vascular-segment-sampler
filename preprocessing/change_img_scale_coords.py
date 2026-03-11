@@ -1,7 +1,15 @@
 import os
+import sys
+from pathlib import Path
+
 import SimpleITK as sitk
 import math
 from datetime import datetime
+
+# Add project root to path so "from modules import ..." works
+_project_root = Path(__file__).resolve().parent.parent
+if _project_root not in sys.path:
+    sys.path.insert(0, str(_project_root))
 
 
 def change_img_scale(img_path, scale, scale_origin=None, direction_matrix=None, change_lps_to_ras=False, verbose=False, if_spacing_file=False, spacing_value=None):

@@ -1,8 +1,16 @@
 import os
+import sys
+from pathlib import Path
+
 import vtk
 
+# Add project root to path so "from modules import ..." works
+_project_root = Path(__file__).resolve().parent.parent
+if _project_root not in sys.path:
+    sys.path.insert(0, str(_project_root))
 
-def scale_polydata(input_file, output_file, scale_factor):
+
+def scale_polydata(input_file, output_file, scale_factor, direction_matrix=None, rotation_center=None):
     # Determine file type and use appropriate reader
     if input_file.endswith('.vtp'):
         reader = vtk.vtkXMLPolyDataReader()
@@ -20,10 +28,25 @@ def scale_polydata(input_file, output_file, scale_factor):
     # Get the points of the polydata
     points = polydata.GetPoints()
 
-    # Scale the points by the scale_factor
+    # Scale and optionally transform the points
+    # rotation_center: center of rotation in input mesh coords (e.g. image origin).
+    # Applied after scaling so mesh and image use same pivot.
+    m = direction_matrix  # row-major 3x3: [m00,m01,m02, m10,m11,m12, m20,m21,m22]
+    cx, cy, cz = (0.0, 0.0, 0.0) if rotation_center is None else rotation_center
+    cx, cy, cz = cx * scale_factor, cy * scale_factor, cz * scale_factor
     for i in range(points.GetNumberOfPoints()):
         x, y, z = points.GetPoint(i)
-        points.SetPoint(i, x * scale_factor, y * scale_factor, z * scale_factor)
+        x, y, z = x * scale_factor, y * scale_factor, z * scale_factor
+        if m is not None:
+            # Rotate around center: p' = R*(p - c) + c
+            x, y, z = x - cx, y - cy, z - cz
+            x, y, z = (
+                m[0] * x + m[1] * y + m[2] * z,
+                m[3] * x + m[4] * y + m[5] * z,
+                m[6] * x + m[7] * y + m[8] * z,
+            )
+            x, y, z = x + cx, y + cy, z + cz
+        points.SetPoint(i, x, y, z)
 
     # Also scale any data arrays named 'MaximumInscribedSphereRadius' in point or cell data
     try:
@@ -71,15 +94,18 @@ def scale_polydata(input_file, output_file, scale_factor):
     writer.Write()
 
 
-def process_folder(input_folder, output_folder, scale_factor):
-    try:
-        from modules.logger import get_logger
-    except Exception:
-        import sys
-        repo_root = os.path.dirname(os.path.dirname(__file__))
-        if repo_root not in sys.path:
-            sys.path.insert(0, repo_root)
-        from modules.logger import get_logger
+def _find_image_for_surface(surface_name, image_folder, image_extensions=('.mha', '.mhd', '.nii', '.nii.gz', '.nrrd')):
+    """Find image in folder matching surface base name. Returns path or None."""
+    stem = Path(surface_name).stem
+    for ext in image_extensions:
+        candidate = os.path.join(image_folder, stem + ext)
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
+def process_folder(input_folder, output_folder, scale_factor, direction_matrix=None, rotation_center=None, image_folder_for_origin=None):
+    from modules.logger import get_logger
     logger = get_logger(__name__)
     
     # Loop over all .vtp and .stl files in the folder
@@ -90,8 +116,18 @@ def process_folder(input_folder, output_folder, scale_factor):
         input_file = os.path.join(input_folder, file_name)
         output_file = os.path.join(output_folder, file_name)
 
-        # Scale the polydata and save the new file
-        scale_polydata(input_file, output_file, scale_factor)
+        # Resolve rotation center: fixed value, or from matching image in folder
+        rc = rotation_center
+        if rc is None and image_folder_for_origin is not None:
+            img_path = _find_image_for_surface(file_name, image_folder_for_origin)
+            if img_path:
+                import SimpleITK as sitk
+                img = sitk.ReadImage(img_path)
+                origin = img.GetOrigin()
+                rc = [float(origin[i]) for i in range(min(3, len(origin)))] if origin else None
+
+        # Scale and optionally transform the polydata, then save
+        scale_polydata(input_file, output_file, scale_factor, direction_matrix, rc)
         logger.info(f"Scaled {file_name} and saved to {output_file}")
     
     logger.info(f"Completed scaling {len(files)} files")
@@ -106,6 +142,12 @@ if __name__ == "__main__":
         epilog="""
 Examples:
   python change_vtk_scale_coords.py --input_dir /path/to/surfaces --output_dir /path/to/output --scale_factor 0.1
+  
+  # Rotate 180 deg around Z (e.g. to match image transform):
+  python change_vtk_scale_coords.py --input_dir /path/to/surfaces --output_dir /path/to/rotated --scale_factor 1 --direction_matrix -1 0 0 0 -1 0 0 0 1
+  
+  # Same rotation around image origin (so mesh aligns with rotated image):
+  python change_vtk_scale_coords.py --input_dir /path/to/surfaces --output_dir /path/to/rotated --direction_matrix -1 0 0 0 -1 0 0 0 1 --image_folder_for_origin /path/to/images
   
   # Using default directory:
   python change_vtk_scale_coords.py --scale_factor 0.1
@@ -123,8 +165,27 @@ Examples:
                             'Defaults to inferred from input_dir')
     parser.add_argument('--scale_factor', '--scale-factor',
                        type=float,
-                       required=True,
-                       help='Scale factor to apply to coordinates (e.g., 0.1 to convert mm to cm)')
+                       default=1.0,
+                       help='Scale factor to apply to coordinates (default: 1.0, e.g. 0.1 to convert mm to cm)')
+    parser.add_argument('--direction_matrix', '--direction-matrix',
+                       type=float,
+                       nargs=9,
+                       metavar=('M00', 'M01', 'M02', 'M10', 'M11', 'M12', 'M20', 'M21', 'M22'),
+                       default=None,
+                       help='3x3 transform matrix (row-major) to apply to coordinates after scaling. '
+                            'E.g. 180 deg around Z: -1 0 0 0 -1 0 0 0 1')
+    parser.add_argument('--rotation_center', '--rotation-center',
+                       type=float,
+                       nargs=3,
+                       metavar=('X', 'Y', 'Z'),
+                       default=None,
+                       help='Center of rotation in mesh coordinates (e.g. image origin). '
+                            'Use with direction_matrix to rotate around same point as image.')
+    parser.add_argument('--image_folder_for_origin', '--image-folder-for-origin',
+                       type=str,
+                       default=None,
+                       help='Folder of images; for each surface, use origin of matching image (same base name) '
+                            'as rotation_center. Convenient when rotating mesh to match rotated images.')
     
     args = parser.parse_args()
     
@@ -132,6 +193,12 @@ Examples:
     input_folder = args.input_dir or './data/surfaces/'
     output_folder = args.output_dir or input_folder.rstrip('/') + '_scaled/'
     scale_factor = args.scale_factor
+    direction_matrix = args.direction_matrix
+    if args.rotation_center is not None:
+        rotation_center = args.rotation_center
+    else:
+        rotation_center = None
+    image_folder_for_origin = args.image_folder_for_origin
 
     # Validate directories
     if not os.path.exists(input_folder):
@@ -143,15 +210,8 @@ Examples:
         os.makedirs(output_folder, exist_ok=True)
     
     # Initialize logger
-    try:
-        from modules.logger import get_logger
-    except Exception:
-        import sys
-        repo_root = os.path.dirname(os.path.dirname(__file__))
-        if repo_root not in sys.path:
-            sys.path.insert(0, repo_root)
-        from modules.logger import get_logger
+    from modules.logger import get_logger
     logger = get_logger(__name__)
-    logger.info(f"Scaling surfaces from {input_folder} to {output_folder} with factor {scale_factor}")
+    logger.info(f"Processing surfaces from {input_folder} to {output_folder} (scale={scale_factor}, direction_matrix={'yes' if direction_matrix else 'no'}, rotation_center={rotation_center}, image_folder_for_origin={image_folder_for_origin})")
     
-    process_folder(input_folder, output_folder, scale_factor)
+    process_folder(input_folder, output_folder, scale_factor, direction_matrix, rotation_center, image_folder_for_origin)
