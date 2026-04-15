@@ -1,0 +1,43 @@
+{
+  "none": [{}],
+  "laplacian": [
+    {"iterations": 25, "relaxation_factor": 0.05, "boundary_smoothing": true},
+    {"iterations": 25, "relaxation_factor": 0.1, "boundary_smoothing": true},
+    {"iterations": 25, "relaxation_factor": 0.15, "boundary_smoothing": true},
+    {"iterations": 25, "relaxation_factor": 0.2, "boundary_smoothing": true},
+    {"iterations": 50, "relaxation_factor": 0.1, "boundary_smoothing": true},
+    {"iterations": 75, "relaxation_factor": 0.1, "boundary_smoothing": true},
+    {"iterations": 100, "relaxation_factor": 0.1, "boundary_smoothing": true},
+    {"iterations": 100, "relaxation_factor": 0.25, "boundary_smoothing": true}
+  ],
+  "taubin": [
+    {"iterations": 25, "boundary": false, "feature": false, "smoothing_factor": 0.1},
+    {"iterations": 25, "boundary": false, "feature": false, "smoothing_factor": 0.25},
+    {"iterations": 25, "boundary": false, "feature": false, "smoothing_factor": 0.5},
+    {"iterations": 25, "boundary": false, "feature": false, "smoothing_factor": 0.75},
+    {"iterations": 50, "boundary": false, "feature": false, "smoothing_factor": 0.1},
+    {"iterations": 50, "boundary": false, "feature": false, "smoothing_factor": 0.25},
+    {"iterations": 50, "boundary": false, "feature": false, "smoothing_factor": 0.5},
+    {"iterations": 50, "boundary": false, "feature": false, "smoothing_factor": 0.75},
+    {"iterations": 75, "boundary": false, "feature": false, "smoothing_factor": 0.1},
+    {"iterations": 100, "boundary": false, "feature": false, "smoothing_factor": 0.1}
+  ],
+  "taubin_cot": [
+    {"iterations": 50, "mu1": 0.45, "mu2": 0.455},
+    {"iterations": 50, "mu1": 0.48, "mu2": 0.52},
+    {"iterations": 30, "mu1": 0.5, "mu2": 0.51},
+    {"iterations": 50, "mu1": 0.5, "mu2": 0.51},
+    {"iterations": 50, "mu1": 0.52, "mu2": 0.53},
+    {"iterations": 100, "mu1": 0.5, "mu2": 0.51},
+    {"iterations": 150, "mu1": 0.5, "mu2": 0.51},
+    {"iterations": 200, "mu1": 0.5, "mu2": 0.51},
+    {"iterations": 50, "mu1": 0.6, "mu2": 0.61},
+    {"iterations": 50, "mu1": 0.65, "mu2": 0.655},
+    {"iterations": 50, "mu1": 0.7, "mu2": 0.71},
+    {"iterations": 50, "mu1": 0.75, "mu2": 0.76},
+    {"iterations": 50, "mu1": 0.8, "mu2": 0.81},
+    {"iterations": 50, "mu1": 0.85, "mu2": 0.86},
+    {"iterations": 50, "mu1": 0.9, "mu2": 0.91},
+    {"iterations": 50, "mu1": 0.95, "mu2": 0.96}
+  ]
+}

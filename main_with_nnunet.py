@@ -54,6 +54,12 @@ def run_main_py(args):
         cmd.extend(['--max_samples', str(args.max_samples)])
     if args.modality:
         cmd.extend(['--modality', args.modality])
+    if args.truth_from_surface:
+        cmd.append('--truth_from_surface')
+    if args.truth_target_spacing is not None:
+        cmd.extend(['--truth_target_spacing'] + [str(x) for x in args.truth_target_spacing])
+    if args.truth_regenerate:
+        cmd.append('--truth_regenerate')
     
     print(f"Command: {' '.join(cmd)}")
     print()
@@ -200,6 +206,19 @@ Examples:
                         type=str,
                         default=None,
                         help='Imaging modality: CT, MR, or comma-separated list (CT,MR)')
+    parser.add_argument('--truth_from_surface', '--seg_from_surface',
+                        dest='truth_from_surface',
+                        action='store_true',
+                        help='Forward to main.py: rasterize surfaces/ to truths/ (global/create_seg_from_surf.py).')
+    parser.add_argument('--truth_target_spacing',
+                        type=float,
+                        nargs=3,
+                        metavar=('SX', 'SY', 'SZ'),
+                        default=None,
+                        help='Forward to main.py: truth voxel spacing in mm (optional).')
+    parser.add_argument('--truth_regenerate',
+                        action='store_true',
+                        help='Forward to main.py: overwrite existing truths/ from surfaces.')
     
     # Arguments for create_nnunet.py
     parser.add_argument('-nnunet_name', '--nnunet_name',

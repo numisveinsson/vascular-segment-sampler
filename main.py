@@ -26,14 +26,83 @@ from modules.sampling_functions import (
     get_proj_traj
     )
 from modules.pre_process import resample_spacing
-from dataset_dirs.datasets import get_case_dict_dir, create_dataset
+from dataset_dirs.datasets import get_case_dict_dir, create_dataset, resolve_case_surface_path
+from preprocessing.change_img_resample import resample_image
 
 import multiprocessing
+import importlib.util
+import SimpleITK as sitk
 
 start_time = time.time()
 now = datetime.now()
 dt_string = now.strftime("_%d_%m_%Y_%H_%M_%S")
 sys.stdout.flush()
+
+_CREATE_SEG_SURF_MOD = None
+
+
+def _get_create_seg_surf_mod():
+    """Load global/create_seg_from_surf.py once (directory name ``global`` is not importable as a package)."""
+    global _CREATE_SEG_SURF_MOD
+    if _CREATE_SEG_SURF_MOD is None:
+        path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            'global',
+            'create_seg_from_surf.py',
+        )
+        spec = importlib.util.spec_from_file_location('create_seg_from_surf', path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _CREATE_SEG_SURF_MOD = mod
+    return _CREATE_SEG_SURF_MOD
+
+
+def _load_surface_vtk(surface_path):
+    """Load a triangular mesh from .vtp (project reader) or .stl."""
+    import vtk
+    if surface_path.endswith('.stl'):
+        reader = vtk.vtkSTLReader()
+        reader.SetFileName(surface_path)
+        reader.Update()
+        return reader.GetOutput()
+    return vf.read_geo(surface_path).GetOutput()
+
+
+def _ensure_truth_from_surface(global_config, case_dict):
+    """
+    Write case_dict['SEGMENTATION'] by rasterizing resolve_case_surface_path(...)
+    via global/create_seg_from_surf.py (VTK stencil). Optional TRUTH_TARGET_SPACING
+    resamples the truth grid (and main.py then resamples the image to match).
+    """
+    seg_path = case_dict['SEGMENTATION']
+    truths_dir = os.path.dirname(seg_path)
+    if truths_dir and not os.path.exists(truths_dir):
+        os.makedirs(truths_dir, exist_ok=True)
+
+    regen = global_config.get('TRUTH_REGENERATE', False)
+    if not regen and os.path.isfile(seg_path):
+        print(f"Using existing segmentation: {seg_path}")
+        return
+
+    surf_path = resolve_case_surface_path(global_config['DATA_DIR'], case_dict['NAME'])
+    if surf_path is None:
+        raise FileNotFoundError(
+            f"No surface mesh found for case {case_dict['NAME']} under "
+            f"{global_config['DATA_DIR']}surfaces/ (.vtp or .stl)"
+        )
+
+    mod = _get_create_seg_surf_mod()
+    surface = mod.load_surface_polydata(surf_path)
+    img_sitk = sitk.ReadImage(case_dict['IMAGE'])
+    ts = global_config.get('TRUTH_TARGET_SPACING')
+    seg_out = mod.seg_sitk_from_surface_polydata(
+        surface,
+        img_sitk,
+        target_spacing=ts,
+        resample_order=3,
+    )
+    sitk.WriteImage(seg_out, seg_path)
+    print(f"Wrote segmentation from surface: {seg_path}")
 
 
 def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
@@ -93,14 +162,32 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
         except Exception as e:
             print(e)
 
-    # Read Image Metadata
-    reader_seg0 = sf.read_image(case_dict['SEGMENTATION'])
-    (reader_im0, origin_im0,
-     size_im, spacing_im) = sf.import_image(case_dict['IMAGE'])
+    # Read Image Metadata (optionally build truths/ from surfaces/ first)
+    if global_config.get('SEG_FROM_SURFACE'):
+        _ensure_truth_from_surface(global_config, case_dict)
+        ts = global_config.get('TRUTH_TARGET_SPACING')
+        if ts is not None:
+            img_full = sitk.ReadImage(case_dict['IMAGE'])
+            reader_im0 = resample_image(img_full, target_spacing=list(ts), order=3)
+            reader_seg0 = sitk.ReadImage(case_dict['SEGMENTATION'])
+            origin_im0 = np.array(list(reader_im0.GetOrigin()))
+            size_im = np.array(list(reader_im0.GetSize()))
+            spacing_im = np.array(list(reader_im0.GetSpacing()))
+        else:
+            reader_seg0 = sf.read_image(case_dict['SEGMENTATION'])
+            (reader_im0, origin_im0,
+             size_im, spacing_im) = sf.import_image(case_dict['IMAGE'])
+    else:
+        reader_seg0 = sf.read_image(case_dict['SEGMENTATION'])
+        (reader_im0, origin_im0,
+         size_im, spacing_im) = sf.import_image(case_dict['IMAGE'])
 
     # Surface Caps
     if global_config['CAPFREE'] or global_config['WRITE_SURFACE']:
-        global_surface = vf.read_geo(case_dict['SURFACE']).GetOutput()
+        surf_path = resolve_case_surface_path(global_config['DATA_DIR'], case_dict['NAME'])
+        if surf_path is None:
+            surf_path = case_dict['SURFACE']
+        global_surface = _load_surface_vtk(surf_path)
         if global_config['CAPFREE']:
             cap_locs = get_surf_caps(global_surface)
 
@@ -550,6 +637,21 @@ if __name__ == '__main__':
                         type=str,
                         default='',
                         help='Suffix to append to all output names within outdir (e.g. _first makes ct_test -> ct_test_first).')
+    parser.add_argument('--truth_from_surface', '--seg_from_surface',
+                        dest='truth_from_surface',
+                        action='store_true',
+                        help='Rasterize surfaces/ to truths/ using global/create_seg_from_surf.py instead of requiring '
+                             'pre-existing segmentations. Needs images/, surfaces/ (.vtp or .stl), centerlines/.')
+    parser.add_argument('--truth_target_spacing',
+                        type=float,
+                        nargs=3,
+                        metavar=('SX', 'SY', 'SZ'),
+                        default=None,
+                        help='Optional voxel spacing (mm) for the truth volume. The sampling image is resampled to '
+                             'this grid so image and mask stay aligned. Omit to use native image spacing.')
+    parser.add_argument('--truth_regenerate',
+                        action='store_true',
+                        help='Regenerate truth from surface even if the truths/ file already exists.')
     args = parser.parse_args()
 
     print(args)
@@ -586,6 +688,10 @@ if __name__ == '__main__':
     
     output_suffix = args.output_suffix or ''
     global_config['OUTPUT_SUFFIX'] = output_suffix
+
+    global_config['SEG_FROM_SURFACE'] = bool(args.truth_from_surface)
+    global_config['TRUTH_TARGET_SPACING'] = args.truth_target_spacing
+    global_config['TRUTH_REGENERATE'] = bool(args.truth_regenerate)
 
     modalities = global_config['MODALITY']
 

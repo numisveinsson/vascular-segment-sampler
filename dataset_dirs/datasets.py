@@ -10,7 +10,13 @@ def create_dataset(global_config, modality):
     print(f'Subfolders need to be:\n images\n truths\n surfaces\n centerlines')
 
     if dataset_name == 'vmr':
-        Dataset = VMR_dataset(global_config['DATA_DIR'], [modality], global_config['ANATOMY'])
+        img_mods = global_config.get('VMR_IMAGE_MODALITIES')
+        Dataset = VMR_dataset(
+            global_config['DATA_DIR'],
+            [modality],
+            global_config['ANATOMY'],
+            image_modalities=img_mods,
+        )
         cases = Dataset.sort_cases(global_config['TESTING'], global_config['TEST_CASES'])
         cases = Dataset.check_which_cases_in_image_dir(cases)
         cases = [f for f in cases if f not in global_config['BAD_CASES']]
@@ -89,7 +95,7 @@ class VMR_dataset:
         Surfaces (surface meshes)
         Centerlines (centerline meshes)
     """
-    def __init__(self, directory, modality=None, anatomy=None):
+    def __init__(self, directory, modality=None, anatomy=None, image_modalities=None):
         self.dir = directory
         self.modality = modality
         self.anatomy = anatomy
@@ -105,8 +111,9 @@ class VMR_dataset:
                 print(f'Could not read local CSV file: {e2}')
                 self.df = None
         # get the cases of specified modality and anatomy
-        if modality is not None:
-            self.df = get_vmr_names_modality(self.df, modality)
+        mod_list = image_modalities if image_modalities is not None else modality
+        if mod_list is not None:
+            self.df = get_vmr_names_modality(self.df, mod_list)
         if anatomy is not None:
             self.df = get_vmr_names_anatomy(self.df, anatomy)
 
@@ -188,6 +195,20 @@ class VMR_dataset:
         # return list of cases in image dir that are in the google sheet
         return images
         
+def resolve_case_surface_path(directory, model):
+    """
+    Return path to surfaces/{model}.vtp or surfaces/{model}.stl if it exists, else None.
+    Prefer .vtp when both exist.
+    """
+    import os
+    surf_dir = os.path.join(directory, 'surfaces')
+    for ext in ('.vtp', '.stl'):
+        p = os.path.join(surf_dir, model + ext)
+        if os.path.exists(p):
+            return p
+    return None
+
+
 def get_case_dict_dir(directory, model, img_ext):
     """
     Get the directories of the case
@@ -236,11 +257,14 @@ def get_vmr_names_modality(df, modality):
     """
     Returns a pandas dataframe of the VMR dataset names
     Input: modality (list of str)
-    Possible values: 
-    'CT'
+    Possible values:
+    'CT' (includes sheet rows labeled CTA)
     'MR'
     """
-    return df[df['Image Modality'].isin(modality)]
+    modal = list(modality)
+    if "CT" in modal and "CTA" not in modal:
+        modal = modal + ["CTA"]
+    return df[df["Image Modality"].isin(modal)]
 
 def get_vmr_names_anatomy(df, anatomy):
     """

@@ -6,9 +6,15 @@ and randomly splits the cases into training and testing sets based on a specifie
 """
 
 import os
+import sys
 import shutil
 import argparse
 import random
+from pathlib import Path
+
+# Add project root to path so modules can be imported when run as a script
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from modules.logger import get_logger
 
 
@@ -31,17 +37,23 @@ def get_base_names(folder, extensions=['.mha', '.nii.gz', '.nii', '.vti', '.vtp'
     return base_names
 
 
-def get_case_names(base_folder, subfolders=['images', 'centerlines', 'surfaces', 'truths', 'labels']):
+DEFAULT_SUBFOLDERS = ['images', 'centerlines', 'surfaces', 'truths', 'labels']
+
+
+def get_case_names(base_folder, subfolders=None):
     """
     Get case names from the dataset folder.
     
     Args:
         base_folder: Path to the base folder containing subfolders
-        subfolders: List of subfolder names to check
+        subfolders: List of subfolder names to require (default: all standard subfolders that exist)
     
     Returns:
         List of case names (base names without extensions)
     """
+    if subfolders is None:
+        subfolders = DEFAULT_SUBFOLDERS
+    
     logger = get_logger(__name__)
     
     # Check which subfolders exist
@@ -62,18 +74,9 @@ def get_case_names(base_folder, subfolders=['images', 'centerlines', 'surfaces',
         raise ValueError(f"No valid subfolders found in {base_folder}. "
                         f"Expected one of: {subfolders}")
     
-    # Get case names - prefer images folder, otherwise use intersection of all folders
-    if 'images' in existing_subfolders:
-        case_names = list(name_sets['images'])
-        logger.info(f"Using case names from images/ folder: {len(case_names)} cases")
-    else:
-        # Use intersection of all existing folders
-        if len(existing_subfolders) > 1:
-            case_names = list(set.intersection(*[name_sets[sf] for sf in existing_subfolders]))
-            logger.info(f"Using intersection of {existing_subfolders}: {len(case_names)} cases")
-        else:
-            case_names = list(name_sets[existing_subfolders[0]])
-            logger.info(f"Using case names from {existing_subfolders[0]}/: {len(case_names)} cases")
+    # Use only cases present in ALL subfolders (intersection)
+    case_names = list(set.intersection(*[name_sets[sf] for sf in existing_subfolders]))
+    logger.info(f"Using cases present in all subfolders {existing_subfolders}: {len(case_names)} cases")
     
     if not case_names:
         raise ValueError(f"No cases found in {base_folder}")
@@ -82,7 +85,7 @@ def get_case_names(base_folder, subfolders=['images', 'centerlines', 'surfaces',
     return case_names, existing_subfolders
 
 
-def split_dataset(base_folder, train_split, output_folder=None, seed=None, copy_files=True):
+def split_dataset(base_folder, train_split, output_folder=None, seed=None, copy_files=True, subfolders=None):
     """
     Split dataset into training and testing sets.
     
@@ -107,7 +110,7 @@ def split_dataset(base_folder, train_split, output_folder=None, seed=None, copy_
         logger.info(f"Using random seed: {seed}")
     
     # Get case names
-    case_names, existing_subfolders = get_case_names(base_folder)
+    case_names, existing_subfolders = get_case_names(base_folder, subfolders=subfolders)
     logger.info(f"Total cases found: {len(case_names)}")
     
     # Shuffle and split
@@ -206,6 +209,9 @@ Examples:
   # Split with 80% training, 20% testing (copy files)
   python preprocessing/split_train_test.py --folder /path/to/data --train_split 0.8
   
+  # Use only cases present in images AND truths (more cases if surfaces has fewer)
+  python preprocessing/split_train_test.py --folder /path/to/data --train_split 0.8 --subfolders images truths
+  
   # Split with 70% training, 30% testing (move files)
   python preprocessing/split_train_test.py --folder /path/to/data --train_split 0.7 --move
   
@@ -218,6 +224,12 @@ Examples:
                        type=str,
                        required=True,
                        help='Path to folder containing subfolders (images, centerlines, surfaces, truths, labels)')
+    parser.add_argument('--subfolders',
+                       type=str,
+                       nargs='+',
+                       default=None,
+                       help='Subfolders that must all contain a case for it to be included (default: all existing). '
+                            'E.g. --subfolders images truths to use only cases present in both')
     parser.add_argument('--train_split', '--train-split',
                        type=float,
                        required=True,
@@ -255,7 +267,8 @@ Examples:
             train_split=args.train_split,
             output_folder=args.output,
             seed=args.seed,
-            copy_files=not args.move
+            copy_files=not args.move,
+            subfolders=args.subfolders
         )
         
         logger.info("=" * 80)

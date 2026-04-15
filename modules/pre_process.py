@@ -16,10 +16,13 @@ def resample(sitkIm, resolution = (0.5, 0.5, 0.5),order=1,dim=3):
     resample = sitk.ResampleImageFilter()
     if order==1:
       resample.SetInterpolator(sitk.sitkLinear)
+      print("Using linear interpolation")
     elif order==2:
       resample.SetInterpolator(sitk.sitkBSpline)
+      print("Using b-spline interpolation")
     else:
       resample.SetInterpolator(sitk.sitkNearestNeighbor)
+      print("Using nearest neighbor interpolation")
     resample.SetOutputDirection(image.GetDirection())
     resample.SetOutputOrigin(image.GetOrigin())
     resample.SetOutputSpacing(resolution)

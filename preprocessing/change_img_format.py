@@ -1,5 +1,14 @@
 import os
+import sys
+from pathlib import Path
+
 import SimpleITK as sitk
+
+# Add project root to path so "from modules import ..." works
+_project_root = Path(__file__).resolve().parent.parent
+if _project_root not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 from modules import vtk_functions as vf
 
 
@@ -141,7 +150,7 @@ Examples:
                        type=str,
                        default=None,
                        help='Directory containing input image files. '
-                            'Defaults to ./data/images/')
+                            'Trailing slash optional. Defaults to ./data/images')
     parser.add_argument('--output_dir', '--output-dir',
                        type=str,
                        default=None,
@@ -182,8 +191,15 @@ Examples:
     rem_str = args.rem_str
 
     # Use command-line arguments (required or default)
-    data_folder = args.input_dir or './data/images/'
-    out_folder = args.output_dir or data_folder.replace('images', 'images_' + output_format.replace('.', ''))
+    data_folder = os.path.normpath(
+        os.path.expanduser(args.input_dir or os.path.join('.', 'data', 'images'))
+    )
+    if args.output_dir:
+        out_folder = os.path.normpath(os.path.expanduser(args.output_dir))
+    else:
+        out_folder = data_folder.replace(
+            'images', 'images_' + output_format.replace('.', '')
+        )
     
     # Validate directories
     if not os.path.exists(data_folder):
@@ -218,8 +234,9 @@ Examples:
         dicom_names = reader.GetGDCMSeriesFileNames(data_folder)
         reader.SetFileNames(dicom_names)
         img = reader.Execute()
-        logger.info(f"Saving 3D image to {out_folder+'3D_image'+output_format}")
-        sitk.WriteImage(img, out_folder+'3D_image'+output_format)
+        out_3d = os.path.join(out_folder, '3D_image' + output_format)
+        logger.info(f"Saving 3D image to {out_3d}")
+        sitk.WriteImage(img, out_3d)
     else:
         # it's a single file
         for fn in imgs:
@@ -237,25 +254,26 @@ Examples:
             
             # Compute pre-conversion bounds
             before_bounds = None
+            in_path = os.path.join(data_folder, fn)
             if input_format == '.vti':
-                vtk_before = vf.read_img(data_folder+fn).GetOutput()
+                vtk_before = vf.read_img(in_path).GetOutput()
                 before_bounds = _compute_bounds_vtk(vtk_before)
             else:
-                sitk_before = sitk.ReadImage(data_folder+fn)
+                sitk_before = sitk.ReadImage(in_path)
                 before_bounds = _compute_bounds_sitk(sitk_before)
             
             if input_format != '.vti' and output_format != '.vti':
-                img = sitk.ReadImage(data_folder+fn)
+                img = sitk.ReadImage(in_path)
                 if is_label:
                     img = sitk.Cast(img, sitk.sitkUInt8)
             elif input_format == '.vti':
                 if output_format == '.mha' or output_format == '.nii.gz':
-                    img = change_vti_sitk(data_folder+fn, is_label)
+                    img = change_vti_sitk(in_path, is_label)
                 else:
-                    img = vf.read_img(data_folder+fn).GetOutput()
+                    img = vf.read_img(in_path).GetOutput()
             elif output_format == '.vti':
                 if input_format in ['.mha', '.nii.gz', '.nii', '.mhd']:
-                    img = change_mha_vti(data_folder+fn, is_label)
+                    img = change_mha_vti(in_path, is_label)
             else:
                 logger.error('Invalid input/output format combination')
                 break
@@ -279,12 +297,13 @@ Examples:
                 logger.warning(f"  WARNING: Bounds differ (tol=1e-4). Diffs per axis (min,max): {diffs}")
 
             logger.info(f"Saving {img_name}")
+            out_path = os.path.join(out_folder, img_name + output_format)
             if output_format != '.vti':
-                sitk.WriteImage(img, out_folder+img_name+output_format)
+                sitk.WriteImage(img, out_path)
             else:
-                vf.write_img(out_folder+img_name+output_format, img)
+                vf.write_img(out_path, img)
 
             if surface and is_label:  # Only create surfaces for label files
                 img_vtk = vf.exportSitk2VTK(img)[0]
                 poly = vf.vtk_marching_cube(img_vtk, 0, 1)
-                vf.write_geo(out_folder+img_name+'.vtp', poly)
+                vf.write_geo(os.path.join(out_folder, img_name + '.vtp'), poly)
