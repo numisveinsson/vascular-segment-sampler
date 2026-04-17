@@ -60,6 +60,8 @@ def run_main_py(args):
         cmd.extend(['--truth_target_spacing'] + [str(x) for x in args.truth_target_spacing])
     if args.truth_regenerate:
         cmd.append('--truth_regenerate')
+    if args.yes:
+        cmd.append('--yes')
     
     print(f"Command: {' '.join(cmd)}")
     print()
@@ -219,6 +221,9 @@ Examples:
     parser.add_argument('--truth_regenerate',
                         action='store_true',
                         help='Forward to main.py: overwrite existing truths/ from surfaces.')
+    parser.add_argument('--yes',
+                        action='store_true',
+                        help='Run non-interactively: assume yes for confirmation prompts.')
     
     # Arguments for create_nnunet.py
     parser.add_argument('-nnunet_name', '--nnunet_name',
@@ -250,7 +255,7 @@ Examples:
         print("ERROR: modules.io not available")
         sys.exit(1)
 
-    if not io.prompt_continue("Wish to continue? [y/n]: "):
+    if not args.yes and not io.prompt_continue("Wish to continue? [y/n]: "):
         print("Aborting before starting first case.")
         sys.exit(0)
     

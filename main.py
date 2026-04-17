@@ -663,6 +663,9 @@ if __name__ == '__main__':
     parser.add_argument('--truth_regenerate',
                         action='store_true',
                         help='Regenerate truth from surface even if the truths/ file already exists.')
+    parser.add_argument('--yes',
+                        action='store_true',
+                        help='Run non-interactively: assume yes for confirmation prompts.')
     args = parser.parse_args()
 
     print(args)
@@ -764,7 +767,7 @@ if __name__ == '__main__':
         for i in cases:
             print(f"Case: {i}")
 
-        if cases and not io.prompt_continue("Wish to continue? [y/n]: "):
+        if cases and not args.yes and not io.prompt_continue("Wish to continue? [y/n]: "):
             print("Aborting before starting first case.")
             continue
 
