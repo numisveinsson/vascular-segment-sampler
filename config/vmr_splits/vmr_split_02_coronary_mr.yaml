@@ -47,7 +47,7 @@ RESAMPLE_CROSS_IMG: 400
 WRITE_TRAJECTORIES: False
 N_SLICES: 20
 
-WRITE_VTK: True
+WRITE_VTK: False
 WRITE_VTK_THROWOUT: False
 
 MOVE_DIST: 1.5 # 1.5 how far to move along centerline between sampling, in terms of radius
@@ -63,8 +63,8 @@ MU_SIZE: 5 # mean for subvolume-radius ratio
 SIGMA_SIZE: 0.8 # standard deviation for subvolume-radius ratio
 MU_SHIFT: 0 # mean for subvolume shift off centerline
 SIGMA_SHIFT: 0.8 # standard deviation for subvolume shift off centerline
-NUMBER_SAMPLES: 3 # 2 how many samples to take at each point along vessel
-NUMBER_SAMPLES_BIFURC: 5 # 3 how many samples to take if it's a bifurcation
+NUMBER_SAMPLES: 2 # 2 how many samples to take at each point along vessel
+NUMBER_SAMPLES_BIFURC: 3 # 3 how many samples to take if it's a bifurcation
 NUMBER_SAMPLES_START: 3 # 5 how many samples to take at start of vessel (first 5%), better for initialization + bifurcations if not processed
 MOVE_SLOWER_BIFURC: 0.5 # 0.1 how much slower for bigger vessels
 # Held-out test cases (Legacy Name); excluded from training when TESTING is false.

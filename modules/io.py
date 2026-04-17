@@ -1,6 +1,16 @@
 import yaml
 import csv
 
+
+def prompt_continue(message="Wish to continue? [y/n]: "):
+    """Prompt until a valid y/n answer is provided."""
+    while True:
+        answer = input(message).strip().lower()
+        if answer in ("y", "n"):
+            return answer == "y"
+        print("Please answer with 'y' or 'n'.")
+
+
 def read_lines(fn):
     f = open(fn,'r').readlines()
     f = [s.replace('\n','') for s in f]

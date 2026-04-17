@@ -245,10 +245,20 @@ Examples:
     print("Vascular Segment Sampler with nnUNet Conversion")
     print("=" * 80)
     print()
+
+    if io is None:
+        print("ERROR: modules.io not available")
+        sys.exit(1)
+
+    if not io.prompt_continue("Wish to continue? [y/n]: "):
+        print("Aborting before starting first case.")
+        sys.exit(0)
     
     # Step 1: Run main.py
     try:
         run_main_py(args)
+        if args.truth_regenerate and args.truth_target_spacing is not None:
+            print("Info: Regenerated-truth resampling spacing details are written to info txt by main.py.")
     except KeyboardInterrupt:
         print("\nInterrupted by user")
         sys.exit(1)

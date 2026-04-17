@@ -42,7 +42,7 @@ RESAMPLE_CROSS_IMG: 400
 WRITE_TRAJECTORIES: False
 N_SLICES: 20
 
-WRITE_VTK: True
+WRITE_VTK: False
 WRITE_VTK_THROWOUT: False
 
 MOVE_DIST: 2 # 1.5 how far to move along centerline between sampling, in terms of radius

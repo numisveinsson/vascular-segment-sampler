@@ -82,7 +82,7 @@ def _ensure_truth_from_surface(global_config, case_dict):
     regen = global_config.get('TRUTH_REGENERATE', False)
     if not regen and os.path.isfile(seg_path):
         print(f"Using existing segmentation: {seg_path}")
-        return
+        return False
 
     surf_path = resolve_case_surface_path(global_config['DATA_DIR'], case_dict['NAME'])
     if surf_path is None:
@@ -103,6 +103,7 @@ def _ensure_truth_from_surface(global_config, case_dict):
     )
     sitk.WriteImage(seg_out, seg_path)
     print(f"Wrote segmentation from surface: {seg_path}")
+    return True
 
 
 def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
@@ -164,15 +165,25 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
 
     # Read Image Metadata (optionally build truths/ from surfaces/ first)
     if global_config.get('SEG_FROM_SURFACE'):
-        _ensure_truth_from_surface(global_config, case_dict)
+        truth_regenerated = _ensure_truth_from_surface(global_config, case_dict)
         ts = global_config.get('TRUTH_TARGET_SPACING')
         if ts is not None:
             img_full = sitk.ReadImage(case_dict['IMAGE'])
+            img_spacing_before = tuple(float(v) for v in img_full.GetSpacing())
             reader_im0 = resample_image(img_full, target_spacing=list(ts), order=3)
             reader_seg0 = sitk.ReadImage(case_dict['SEGMENTATION'])
+            truth_spacing = tuple(float(v) for v in reader_seg0.GetSpacing())
             origin_im0 = np.array(list(reader_im0.GetOrigin()))
             size_im = np.array(list(reader_im0.GetSize()))
             spacing_im = np.array(list(reader_im0.GetSpacing()))
+            if truth_regenerated:
+                with open(out_dir + info_file_name, "a") as f:
+                    f.write(
+                        "\n TRUTH RESAMPLING (regenerated truth) - "
+                        f"{case_dict['NAME']}: "
+                        f"image spacing={img_spacing_before}, "
+                        f"truth spacing={truth_spacing}\n"
+                    )
         else:
             reader_seg0 = sf.read_image(case_dict['SEGMENTATION'])
             (reader_im0, origin_im0,
@@ -752,6 +763,10 @@ if __name__ == '__main__':
         print(f"--- {len(cases)} cases ---")
         for i in cases:
             print(f"Case: {i}")
+
+        if cases and not io.prompt_continue("Wish to continue? [y/n]: "):
+            print("Aborting before starting first case.")
+            continue
 
         print_info_file(global_config, cases, global_config['TEST_CASES'], info_file_name)
 
