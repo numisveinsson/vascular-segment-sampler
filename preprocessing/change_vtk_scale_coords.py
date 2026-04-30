@@ -10,7 +10,14 @@ if _project_root not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 
-def scale_polydata(input_file, output_file, scale_factor, direction_matrix=None, rotation_center=None):
+def scale_polydata(
+    input_file,
+    output_file,
+    scale_factor,
+    direction_matrix=None,
+    rotation_center=None,
+    scale_about_center=False,
+):
     # Determine file type and use appropriate reader
     if input_file.endswith('.vtp'):
         reader = vtk.vtkXMLPolyDataReader()
@@ -32,11 +39,22 @@ def scale_polydata(input_file, output_file, scale_factor, direction_matrix=None,
     # rotation_center: center of rotation in input mesh coords (e.g. image origin).
     # Applied after scaling so mesh and image use same pivot.
     m = direction_matrix  # row-major 3x3: [m00,m01,m02, m10,m11,m12, m20,m21,m22]
-    cx, cy, cz = (0.0, 0.0, 0.0) if rotation_center is None else rotation_center
-    cx, cy, cz = cx * scale_factor, cy * scale_factor, cz * scale_factor
+    rcx, rcy, rcz = (0.0, 0.0, 0.0) if rotation_center is None else rotation_center
+    # Anchor scaling at center if requested; otherwise keep legacy scale-around-origin behavior.
+    scx, scy, scz = (rcx, rcy, rcz) if scale_about_center else (0.0, 0.0, 0.0)
+    # Rotation happens after scaling; when scaling is about origin, pivot must be scaled too.
+    if scale_about_center:
+        cx, cy, cz = rcx, rcy, rcz
+    else:
+        cx, cy, cz = rcx * scale_factor, rcy * scale_factor, rcz * scale_factor
     for i in range(points.GetNumberOfPoints()):
         x, y, z = points.GetPoint(i)
-        x, y, z = x * scale_factor, y * scale_factor, z * scale_factor
+        if scale_about_center:
+            x = (x - scx) * scale_factor + scx
+            y = (y - scy) * scale_factor + scy
+            z = (z - scz) * scale_factor + scz
+        else:
+            x, y, z = x * scale_factor, y * scale_factor, z * scale_factor
         if m is not None:
             # Rotate around center: p' = R*(p - c) + c
             x, y, z = x - cx, y - cy, z - cz
@@ -104,7 +122,15 @@ def _find_image_for_surface(surface_name, image_folder, image_extensions=('.mha'
     return None
 
 
-def process_folder(input_folder, output_folder, scale_factor, direction_matrix=None, rotation_center=None, image_folder_for_origin=None):
+def process_folder(
+    input_folder,
+    output_folder,
+    scale_factor,
+    direction_matrix=None,
+    rotation_center=None,
+    image_folder_for_origin=None,
+    scale_about_center=False,
+):
     from modules.logger import get_logger
     logger = get_logger(__name__)
     
@@ -127,7 +153,14 @@ def process_folder(input_folder, output_folder, scale_factor, direction_matrix=N
                 rc = [float(origin[i]) for i in range(min(3, len(origin)))] if origin else None
 
         # Scale and optionally transform the polydata, then save
-        scale_polydata(input_file, output_file, scale_factor, direction_matrix, rc)
+        scale_polydata(
+            input_file,
+            output_file,
+            scale_factor,
+            direction_matrix,
+            rc,
+            scale_about_center=scale_about_center,
+        )
         logger.info(f"Scaled {file_name} and saved to {output_file}")
     
     logger.info(f"Completed scaling {len(files)} files")
@@ -186,6 +219,11 @@ Examples:
                        default=None,
                        help='Folder of images; for each surface, use origin of matching image (same base name) '
                             'as rotation_center. Convenient when rotating mesh to match rotated images.')
+    parser.add_argument('--scale_about_center', '--scale-about-center',
+                       action='store_true',
+                       default=False,
+                       help='Scale around rotation_center instead of (0,0,0). '
+                            'Useful with --image_folder_for_origin to keep mesh aligned to image origin.')
     
     args = parser.parse_args()
     
@@ -199,6 +237,7 @@ Examples:
     else:
         rotation_center = None
     image_folder_for_origin = args.image_folder_for_origin
+    scale_about_center = args.scale_about_center
 
     # Validate directories
     if not os.path.exists(input_folder):
@@ -212,6 +251,19 @@ Examples:
     # Initialize logger
     from modules.logger import get_logger
     logger = get_logger(__name__)
-    logger.info(f"Processing surfaces from {input_folder} to {output_folder} (scale={scale_factor}, direction_matrix={'yes' if direction_matrix else 'no'}, rotation_center={rotation_center}, image_folder_for_origin={image_folder_for_origin})")
+    logger.info(
+        f"Processing surfaces from {input_folder} to {output_folder} "
+        f"(scale={scale_factor}, direction_matrix={'yes' if direction_matrix else 'no'}, "
+        f"rotation_center={rotation_center}, image_folder_for_origin={image_folder_for_origin}, "
+        f"scale_about_center={scale_about_center})"
+    )
     
-    process_folder(input_folder, output_folder, scale_factor, direction_matrix, rotation_center, image_folder_for_origin)
+    process_folder(
+        input_folder,
+        output_folder,
+        scale_factor,
+        direction_matrix,
+        rotation_center,
+        image_folder_for_origin,
+        scale_about_center=scale_about_center,
+    )
