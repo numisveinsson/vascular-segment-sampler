@@ -17,6 +17,113 @@ from datetime import datetime
 from tqdm import tqdm
 
 
+def _normalize_dataset_name(val):
+    """YAML/config DATASET_NAME may include stray spaces or wrong case."""
+    if val is None:
+        return None
+    s = str(val).strip().lower()
+    return s if s else None
+
+
+def _resolve_cases_from_global_config(global_config, split_mode='full'):
+    """
+    Resolve case IDs (Legacy Names for VMR) that match a pipeline YAML config.
+
+    Args:
+        global_config: Dict from load_yaml with DATA_DIR, DATASET_NAME, etc.
+        split_mode:
+            - 'full': All cohort cases present under DATA_DIR (spreadsheet filters +
+              BAD_CASES exclusion); ignores TEST_CASES train/test split.
+            - 'train': Same as pipeline with TESTING=false — excludes TEST_CASES.
+            - 'test': Same as pipeline with TESTING=true — only TEST_CASES in cohort.
+
+    Returns:
+        Set of allowed base names (str), or None if filtering should not apply.
+    """
+    dataset_name = _normalize_dataset_name(global_config.get('DATASET_NAME'))
+    data_dir = global_config.get('DATA_DIR')
+    if not data_dir or not dataset_name:
+        return None
+
+    if dataset_name == 'vmr':
+        from dataset_dirs.datasets import VMR_dataset, create_dataset
+
+        if split_mode == 'full':
+            img_mods = global_config.get('VMR_IMAGE_MODALITIES')
+            modality_arg = global_config.get('MODALITY') or ['CT']
+            anatomy = global_config.get('ANATOMY')
+            Dataset = VMR_dataset(
+                data_dir,
+                modality_arg,
+                anatomy,
+                image_modalities=img_mods,
+            )
+            if Dataset.df is None:
+                raise RuntimeError(
+                    'VMR cohort metadata unavailable (spreadsheet/VMR_dataset_names.csv). '
+                    'Cannot apply --config with split-mode full.'
+                )
+            cases = Dataset.df['Legacy Name'].tolist()
+            cases = Dataset.check_which_cases_in_image_dir(cases)
+            bad = global_config.get('BAD_CASES') or []
+            return set(c for c in cases if c not in bad)
+
+        allowed = set()
+        modalities = global_config.get('MODALITY') or ['CT']
+        gc = dict(global_config)
+        gc['TESTING'] = split_mode == 'test'
+        for modality in modalities:
+            allowed.update(create_dataset(gc, modality))
+        return allowed
+
+    if dataset_name == 'other':
+        if split_mode == 'full':
+            # Dataset layout varies; fingerprint whole folder unless split is specified.
+            return None
+
+        from dataset_dirs.datasets import get_dataset_cases
+
+        img_ext = global_config.get('IMG_EXT', '.mha')
+        return set(get_dataset_cases(
+            data_dir,
+            img_ext,
+            global_config.get('TEST_CASES') or [],
+            testing=(split_mode == 'test'),
+        ))
+
+    return None
+
+
+def load_global_config_with_data_dir(config_path, data_dir_override):
+    """Load YAML config and set DATA_DIR from the fingerprint dataset root."""
+    from modules import io
+
+    config_path = os.path.abspath(os.path.expanduser(config_path))
+    cfg = io.load_yaml(config_path)
+    if cfg is None:
+        raise ValueError(f'Could not load config: {config_path}')
+    cfg = dict(cfg)
+    cfg['DATA_DIR'] = os.path.abspath(data_dir_override)
+    if 'BAD_CASES' not in cfg:
+        cfg['BAD_CASES'] = []
+    if 'TEST_CASES' not in cfg:
+        cfg['TEST_CASES'] = []
+    return cfg
+
+
+# Extensions used when mapping images/truths filenames to case IDs (must stay consistent).
+_VOLUME_CASE_EXTENSIONS = ('.mha', '.nii.gz', '.nii', '.nrrd', '.vti', '.vtk')
+
+
+def _stem_case_filename(filename):
+    """Basename without extension, same convention as get_base_names for volume files."""
+    name = os.path.basename(filename)
+    for ext in _VOLUME_CASE_EXTENSIONS:
+        if name.endswith(ext):
+            return name.replace(ext, '')
+    return None
+
+
 def get_base_names(folder, extensions=['.mha', '.nii.gz', '.nii', '.nrrd', '.vti', '.vtp', '.stl']):
     """Get base filenames without extensions from a folder."""
     if not os.path.exists(folder):
@@ -338,10 +445,13 @@ def detect_file_type(file_path):
         return None
 
 
-def check_file_type_mismatches(base_folder):
+def check_file_type_mismatches(base_folder, restrict_case_names=None):
     """
     Check for files that are in the wrong folder (masks in images, images in truths).
-    
+
+    Args:
+        restrict_case_names: If set, only inspect volume files whose case stem is in this set.
+
     Returns:
         Dictionary with lists of mismatched files
     """
@@ -349,15 +459,19 @@ def check_file_type_mismatches(base_folder):
         'masks_in_images': [],
         'images_in_truths': []
     }
-    
+
     # Check images folder for masks
     images_folder = os.path.join(base_folder, 'images')
     if os.path.exists(images_folder):
         image_files = glob.glob(os.path.join(images_folder, '*'))
-        # Filter to common image extensions
-        image_extensions = ['.mha', '.nii.gz', '.nii', '.nrrd', '.vti', '.vtk']
+        image_extensions = list(_VOLUME_CASE_EXTENSIONS)
         image_files = [f for f in image_files if any(f.endswith(ext) for ext in image_extensions)]
-        
+        if restrict_case_names is not None:
+            image_files = [
+                f for f in image_files
+                if (_stem_case_filename(f) in restrict_case_names)
+            ]
+
         for img_file in tqdm(image_files, desc="Checking images folder for masks", leave=False):
             file_type = detect_file_type(img_file)
             if file_type == 'mask':
@@ -368,10 +482,14 @@ def check_file_type_mismatches(base_folder):
     truths_folder = os.path.join(base_folder, 'truths')
     if os.path.exists(truths_folder):
         truth_files = glob.glob(os.path.join(truths_folder, '*'))
-        # Filter to common image extensions
-        truth_extensions = ['.mha', '.nii.gz', '.nii', '.nrrd', '.vti', '.vtk']
+        truth_extensions = list(_VOLUME_CASE_EXTENSIONS)
         truth_files = [f for f in truth_files if any(f.endswith(ext) for ext in truth_extensions)]
-        
+        if restrict_case_names is not None:
+            truth_files = [
+                f for f in truth_files
+                if (_stem_case_filename(f) in restrict_case_names)
+            ]
+
         for truth_file in tqdm(truth_files, desc="Checking truths folder for images", leave=False):
             file_type = detect_file_type(truth_file)
             if file_type == 'image':
@@ -381,15 +499,18 @@ def check_file_type_mismatches(base_folder):
     return mismatches
 
 
-def check_name_consistency(base_folder):
+def check_name_consistency(base_folder, restrict_case_names=None):
     """Check if filenames match across all subfolders."""
     subfolders = ['images', 'surfaces', 'centerlines', 'truths']
     name_sets = {}
-    
+
     for subfolder in subfolders:
         folder_path = os.path.join(base_folder, subfolder)
         name_sets[subfolder] = get_base_names(folder_path)
-    
+
+    if restrict_case_names is not None:
+        name_sets = {k: (v & restrict_case_names) for k, v in name_sets.items()}
+
     # Find common and unique names
     all_names = set()
     for names in name_sets.values():
@@ -411,15 +532,25 @@ def check_name_consistency(base_folder):
     return consistency_report, name_sets
 
 
-def fingerprint_dataset(base_folder, output_file=None, max_samples=None):
+def fingerprint_dataset(
+    base_folder,
+    output_file=None,
+    max_samples=None,
+    config_path=None,
+    config_split_mode='full',
+):
     """
     Extract comprehensive fingerprint of a medical imaging dataset.
-    
+
     Args:
         base_folder: Path to folder containing images/, surfaces/, centerlines/, truths/ subfolders
         output_file: Optional path to save JSON report
         max_samples: Optional limit on number of files to analyze (for large datasets)
-    
+        config_path: Optional YAML path (same shape as pipeline configs). DATA_DIR is taken from
+            base_folder; cohort filters (e.g. MODALITY, ANATOMY, VMR spreadsheet) restrict cases.
+        config_split_mode: If config_path is set: 'full' (all cohort cases on disk), 'train'
+            (exclude TEST_CASES), or 'test' (TEST_CASES only). Ignored without config_path.
+
     Returns:
         Dictionary with comprehensive dataset statistics
     """
@@ -435,10 +566,36 @@ def fingerprint_dataset(base_folder, output_file=None, max_samples=None):
         raise FileNotFoundError(f"Required folder 'images' not found in {base_folder}")
 
     print(f"Found folders: {existing_folders}")
-    
+
+    loaded_cfg = None
+    allowed_cases = None
+    if config_path:
+        loaded_cfg = load_global_config_with_data_dir(config_path, base_folder)
+        allowed_cases = _resolve_cases_from_global_config(
+            loaded_cfg, split_mode=config_split_mode,
+        )
+        raw_dn = loaded_cfg.get('DATASET_NAME')
+        norm_dn = _normalize_dataset_name(raw_dn)
+        if allowed_cases is None:
+            print(
+                "\n  WARNING: Config did not yield a cohort case list — scanning and "
+                f"processing all cases in the folder. DATASET_NAME={raw_dn!r} "
+                f"(normalized={norm_dn!r}); expected normalized name 'vmr' or 'other' "
+                "with DATA_DIR set."
+            )
+        else:
+            print(
+                f"\n  Cohort filter from config: {len(allowed_cases)} case IDs "
+                "(restricting mask/type checks and per-case statistics)."
+            )
+
+    restrict_scan = allowed_cases if allowed_cases is not None else None
+
     # Check for file type mismatches (masks in images, images in truths)
     print("\nChecking for file type mismatches...")
-    type_mismatches = check_file_type_mismatches(base_folder)
+    type_mismatches = check_file_type_mismatches(
+        base_folder, restrict_case_names=restrict_scan,
+    )
     
     if type_mismatches['masks_in_images']:
         print(f"  WARNING: Found {len(type_mismatches['masks_in_images'])} files in 'images' folder that appear to be masks:")
@@ -460,7 +617,9 @@ def fingerprint_dataset(base_folder, output_file=None, max_samples=None):
     
     # Check name consistency
     print("\nChecking filename consistency...")
-    consistency_report, name_sets = check_name_consistency(base_folder)
+    consistency_report, name_sets = check_name_consistency(
+        base_folder, restrict_case_names=restrict_scan,
+    )
     
     # Add type mismatches to consistency report
     consistency_report['file_type_mismatches'] = type_mismatches
@@ -472,14 +631,46 @@ def fingerprint_dataset(base_folder, output_file=None, max_samples=None):
     # Only process cases in both images and truths
     image_names = set(name_sets.get('images', set()))
     truth_names = set(name_sets.get('truths', set()))
-    common_names = list(image_names & truth_names)
-    common_names.sort()
-    
-    print(f"  Cases in both images and truths: {len(common_names)}")
-    if len(image_names) > len(common_names):
+    folder_common_names = image_names & truth_names
+    common_names = sorted(folder_common_names)
+
+    config_meta = None
+    if config_path and loaded_cfg is not None:
+        allowed = allowed_cases
+        config_meta = {
+            'config_path': os.path.abspath(os.path.expanduser(config_path)),
+            'DATASET_NAME': loaded_cfg.get('DATASET_NAME'),
+            'dataset_name_normalized': _normalize_dataset_name(
+                loaded_cfg.get('DATASET_NAME'),
+            ),
+            'split_mode': config_split_mode,
+            'allowed_count_before_filter': len(allowed) if allowed is not None else None,
+        }
+        if allowed is not None:
+            before = len(common_names)
+            common_names = sorted(n for n in common_names if n in allowed)
+            config_meta['cases_after_filter'] = len(common_names)
+            config_meta['cases_removed_by_config'] = before - len(common_names)
+            print(
+                f"  Config filter ({config_path}, split={config_split_mode}): "
+                f"{before} → {len(common_names)} cases"
+            )
+        else:
+            config_meta['note'] = (
+                'No case-name filter applied (unsupported DATASET_NAME or split mode).'
+            )
+            print(
+                f"  Config loaded ({config_path}) but cohort case filter skipped: "
+                f"{config_meta['note']}"
+            )
+
+    print(f"  Cases in both images and truths (folder): {len(folder_common_names)}")
+    if config_meta and config_meta.get('cases_after_filter') is not None:
+        print(f"  Cases after config cohort filter: {config_meta['cases_after_filter']}")
+    if len(image_names) > len(folder_common_names):
         missing_truths = len(image_names - truth_names)
         print(f"    ({missing_truths} images without corresponding truths)")
-    if len(truth_names) > len(common_names):
+    if len(truth_names) > len(folder_common_names):
         missing_images = len(truth_names - image_names)
         print(f"    ({missing_images} truths without corresponding images)")
 
@@ -491,6 +682,7 @@ def fingerprint_dataset(base_folder, output_file=None, max_samples=None):
     results = {
         'timestamp': datetime.now().isoformat(),
         'base_folder': base_folder,
+        'config_filter': config_meta,
         'consistency': consistency_report,
         'images': {},
         'truths': {},
@@ -797,13 +989,35 @@ if __name__ == '__main__':
     parser.add_argument('folder', type=str, help='Path to dataset folder')
     parser.add_argument('--output', '-o', type=str, help='Output JSON file path (default: saves in dataset folder)')
     parser.add_argument('--max-samples', '-n', type=int, help='Maximum number of samples to analyze')
-    
+    parser.add_argument(
+        '--config',
+        type=str,
+        default=None,
+        help='YAML config (e.g. config/vmr_splits/...). DATA_DIR in the file is ignored; '
+             'use the positional folder as the dataset root. Restricts cases to the cohort '
+             'defined by the config (MODALITY, ANATOMY, VMR_IMAGE_MODALITIES, spreadsheet, …).',
+    )
+    parser.add_argument(
+        '--config-split',
+        type=str,
+        choices=('full', 'train', 'test'),
+        default='full',
+        help="With --config: 'full' = all cohort cases under the folder (default); "
+             "'train' = exclude TEST_CASES; 'test' = only TEST_CASES (same as pipeline TESTING flag).",
+    )
+
     args = parser.parse_args()
-    
+
     output_file = args.output
     if not output_file:
         # Save in the dataset folder by default
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_file = os.path.join(args.folder, f'dataset_fingerprint_{timestamp}.json')
-    
-    fingerprint_dataset(args.folder, output_file=output_file, max_samples=args.max_samples)
+
+    fingerprint_dataset(
+        args.folder,
+        output_file=output_file,
+        max_samples=args.max_samples,
+        config_path=args.config,
+        config_split_mode=args.config_split,
+    )
