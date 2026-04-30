@@ -1,0 +1,120 @@
+# Auto-generated — VMR cohort split (test held out in TEST_CASES).
+# All anatomies — CT+CTA+MR+CT_MR; fixed TEST = union(vmr_split_06_all_ct, vmr_split_07_all_mr_incl_ct_mr)
+# Cases in cohort: all VMR rows matching ANATOMY and VMR_IMAGE_MODALITIES; test list is fixed.
+# Set DATA_DIR when running. Use DATASET_NAME: 'vmr'.
+
+DATASET_NAME: 'vmr'
+
+# DATA_DIR: '/path/to/vascular_data_3d/'
+
+MODALITY: ['CT', 'MR']
+VMR_IMAGE_MODALITIES: ['CT', 'MR', 'CT_MR']
+ANATOMY: ['Aorta', 'Abdominal Aorta', 'Coronary', 'Cerebral', 'Pulmonary', 'Pulmonary Fontan', 'Pulmonary Glenn']
+
+IMG_EXT: '.mha'
+
+
+BINARIZE: True
+SCALED: False
+CROPPED: False
+OUTLET_CLASSES: [0,1,2,3,4,5,6,7,8,9,10]
+
+EXTRACT_VOLUMES: True
+ROTATE_VOLUMES: False
+
+RESAMPLE_VOLUMES: False
+RESAMPLE_SIZE: [64, 64, 64]
+# FIXED_EXTRACT_SIZE: [64, 64, 64]  # Optional: extract always same voxel size (and same physical size for same spacing). Uncomment to enable; omit for radius-based variable extraction.
+
+AUGMENT_VOLUMES: False
+
+WRITE_SAMPLES: True
+WRITE_IMG: True
+REMOVE_OTHER: True # Remove other unconnected vessels in gt volume, can cause problems where vessels are close
+WRITE_SURFACE: False
+WRITE_CENTERLINE: False
+WRITE_VOXEL_PYRAMID: False
+
+WRITE_DISCRETE_CENTERLINE: False
+DISCRETE_CENTERLINE_N_POINTS: 10
+
+WRITE_OUTLET_STATS: False
+WRITE_OUTLET_IMG: False
+UPSAMPLE_OUTLET_IMG: False
+
+WRITE_CROSS_SECTIONAL: False
+NUM_CROSS_SECTIONS: 2  # multiples of 2
+RESAMPLE_CROSS_IMG: 400
+WRITE_TRAJECTORIES: False
+N_SLICES: 20
+
+WRITE_VTK: False
+WRITE_VTK_THROWOUT: False
+
+MOVE_DIST: 1.5 # 1.5 how far to move along centerline between sampling, in terms of radius
+SIZE_RADIUS: 5 # how big a volume to sample, x radius at each location
+RADIUS_ADD: 0.01
+RADIUS_SCALE: 1
+
+CAPFREE: False # whether to require a certain amount of cap-free volume
+CAPFREE_PROP: 0.0 # how much of volume must be cap free, per sidelength
+MIN_DIM: 5 # minimum number of voxels in each dimension for subvolume extraction
+MOVE_SLOWER_LARGE: 0.5  #0.5 how much slower for bigger vessels
+MU_SIZE: 5 # mean for subvolume-radius ratio
+SIGMA_SIZE: 0.8 # standard deviation for subvolume-radius ratio
+MU_SHIFT: 0 # mean for subvolume shift off centerline
+SIGMA_SHIFT: 0.8 # standard deviation for subvolume shift off centerline
+NUMBER_SAMPLES: 2 # 2 how many samples to take at each point along vessel
+NUMBER_SAMPLES_BIFURC: 3 # 3 how many samples to take if it's a bifurcation
+NUMBER_SAMPLES_START: 3 # 5 how many samples to take at start of vessel (first 5%), better for initialization + bifurcations if not processed
+MOVE_SLOWER_BIFURC: 0.5 # 0.1 how much slower for bigger vessels
+
+# Held-out test cases (Legacy Name); excluded from training when TESTING is false.
+TEST_CASES:
+  - '0067_0001'
+  - '0075_1001'
+  - '0077_0001'
+  - '0077_1001'
+  - '0079_0001'
+  - '0083_2002'
+  - '0089_1001'
+  - '0092_0001'
+  - '0098_0001'
+  - '0103_0001'
+  - '0110_0001'
+  - '0111_0001'
+  - '0112_1001'
+  - '0126_0001'
+  - '0129_0000'
+  - '0134_0002'
+  - '0142_1001'
+  - '0151_0001'
+  - '0157_0000'
+  - '0185_0001'
+  - '0189_0001'
+  - 'KDR10_aorta'
+  - 'KDR12'
+  - 'KDR34'
+  - 'KDR34_aorta'
+  - 'O11908'
+  - 'O145207_aorta'
+  - 'O227241_2006'
+  - 'O344211000_2006_aorta'
+  - 'O6397SC_aorta'
+  - 'O683375_2005'
+  - 'P-11'
+  - 'P-14'
+  - 'P-2'
+  - 'P-6'
+  - 'P-8'
+  - 'PT1_6M'
+  - 'RCKD24'
+  - 'SU0206'
+  - 'SU0207'
+  - 'SU0241'
+  - 'SU0259'
+  - 'SU0262'
+  - 'WS1_SU0267_prestent'
+
+# No default bad-case exclusions for this cohort (add if needed).
+BAD_CASES: []

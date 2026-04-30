@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 
 
@@ -39,20 +41,20 @@ def get_dataset_cases(directory, img_ext, test_cases, testing=False):
         test_cases (list of str)
     Output: cases (list of str)
     """
-    import os
-    cases_im = os.listdir(directory+'images/')
+    directory = os.path.abspath(os.path.expanduser(directory))
+    cases_im = os.listdir(os.path.join(directory, 'images'))
     cases_im = [f for f in cases_im if f.endswith(img_ext)]
     cases_im = [f.replace(img_ext, '') for f in cases_im]
     print(f"Found {len(cases_im)} images with extension {img_ext}")
 
-    cases_cent = os.listdir(directory+'centerlines/')
+    cases_cent = os.listdir(os.path.join(directory, 'centerlines'))
     cases_cent = [f for f in cases_cent if f.endswith('.vtp')]
     cases_cent = [f.replace('.vtp', '') for f in cases_cent]
     print(f"Found {len(cases_cent)} centerlines")
 
     # if surface folder exists
-    if os.path.exists(directory+'surfaces/'):
-        cases_surf = os.listdir(directory+'surfaces/')
+    if os.path.exists(os.path.join(directory, 'surfaces')):
+        cases_surf = os.listdir(os.path.join(directory, 'surfaces'))
         cases_surf = [f for f in cases_surf if f.endswith('.vtp')]
         cases_surf = [f.replace('.vtp', '') for f in cases_surf]
         cases_surf = [f.replace('.seg', '') for f in cases_surf]
@@ -96,7 +98,7 @@ class VMR_dataset:
         Centerlines (centerline meshes)
     """
     def __init__(self, directory, modality=None, anatomy=None, image_modalities=None):
-        self.dir = directory
+        self.dir = os.path.abspath(os.path.expanduser(directory))
         self.modality = modality
         self.anatomy = anatomy
         try:
@@ -139,8 +141,8 @@ class VMR_dataset:
         """
         Check which cases are in the data directory (Images)
         """
-        import os
-        images = os.listdir(self.dir + 'images/')
+        img_dir = os.path.join(self.dir, 'images')
+        images = os.listdir(img_dir)
         # ignore hidden files
         images = [f for f in images if f[0] != '.']
         # remove the file extension
@@ -164,9 +166,8 @@ class VMR_dataset:
         """
         Check which cases are in the data directory (Images)
         """
-        # create a list of images in the directory
-        import os
-        images = os.listdir(self.dir + 'images/')
+        img_dir = os.path.join(self.dir, 'images')
+        images = os.listdir(img_dir)
         # ignore hidden files
         images = [f for f in images if f[0] != '.']
         # remove the file extension
@@ -303,10 +304,11 @@ def directories(directory, model, img_ext):
         Centerline VTP
         Surface Mesh VTP
     """
-    dir_image = directory +'images/'+model+img_ext
-    dir_seg = directory +'truths/'+model+img_ext
-    dir_cent = directory + 'centerlines/'+model+'.vtp'
-    dir_surf = directory + 'surfaces/'+model+'.vtp'
+    directory = os.path.abspath(os.path.expanduser(directory))
+    dir_image = os.path.join(directory, 'images', model + img_ext)
+    dir_seg = os.path.join(directory, 'truths', model + img_ext)
+    dir_cent = os.path.join(directory, 'centerlines', model + '.vtp')
+    dir_surf = os.path.join(directory, 'surfaces', model + '.vtp')
 
     return dir_image, dir_seg, dir_cent, dir_surf
 

@@ -11,6 +11,7 @@ import sys
 import os
 import subprocess
 from pathlib import Path
+from tqdm import tqdm
 
 # Add parent directory to path to import modules
 sys.path.insert(0, str(Path(__file__).parent))
@@ -300,7 +301,7 @@ Examples:
             print()
             
             # Run create_nnunet for each modality
-            for modality in modalities:
+            for modality in tqdm(modalities, desc="nnUNet modalities"):
                 try:
                     success = run_create_nnunet(args, modality)
                     if not success:

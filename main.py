@@ -7,6 +7,7 @@ import random
 import os
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 from modules import vtk_functions as vf
 from modules import sitk_functions as sf
@@ -226,8 +227,10 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
     # Make all cent_ids start where the radius is larger
     cent_ids = flip_radius(cent_ids, radii)
 
+    verbose = bool(global_config.get('VERBOSE', False))
+
     # Loop over centerlines
-    for ip in ips_sorted_length:
+    for ip in tqdm(ips_sorted_length, desc=f"{case_dict['NAME']} centerlines", leave=False):
         # Choose destination directory
         (image_out_dir, seg_out_dir,
          val_port) = choose_destination(global_config['TESTING'],
@@ -245,6 +248,9 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
         # locations of those points, radii
         # and bifurcation ids at those locations
         locs, rads, bifurc = c_loc[ids], radii[ids], bifurc_id[ids]
+        if len(locs) < 2:
+            print(f"Skipping centerline {ip} for {case_dict['NAME']} (only {len(locs)} point)")
+            continue
         # Continue taking steps while still on centerline
         on_cent, count = True, 0  # count is the point along centerline
         print(f"\n--- {case_dict['NAME']} ---")
@@ -253,8 +259,9 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
             # Only continue if we've not walked this centerline before
             if not (ids[count] in ids_total):
 
-                print('The point # along centerline is ' + str(count))
-                print('The radius is ' + str(rads[count]))
+                if verbose:
+                    print('The point # along centerline is ' + str(count))
+                    print('The radius is ' + str(rads[count]))
 
                 time_now = time.time()
                 # check if we need to rotate the volume
@@ -302,7 +309,8 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
                         is_inside = False
                     # Continue if surface cap is not present
                     if not is_inside:
-                        print("*", end=" ")
+                        if verbose:
+                            print("*", end=" ")
                         try:
                             name = (case_dict['NAME']+'_'+str(N-n_old)
                                     + '_'+str(sub))
@@ -666,6 +674,9 @@ if __name__ == '__main__':
     parser.add_argument('--yes',
                         action='store_true',
                         help='Run non-interactively: assume yes for confirmation prompts.')
+    parser.add_argument('--verbose',
+                        action='store_true',
+                        help='Enable verbose per-point logs (radius and sample markers).')
     args = parser.parse_args()
 
     print(args)
@@ -706,6 +717,7 @@ if __name__ == '__main__':
     global_config['SEG_FROM_SURFACE'] = bool(args.truth_from_surface)
     global_config['TRUTH_TARGET_SPACING'] = args.truth_target_spacing
     global_config['TRUTH_REGENERATE'] = bool(args.truth_regenerate)
+    global_config['VERBOSE'] = bool(args.verbose)
 
     modalities = global_config['MODALITY']
 
@@ -717,7 +729,7 @@ if __name__ == '__main__':
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
-    for modality in modalities:
+    for modality in tqdm(modalities, desc="Modalities"):
 
         cases = create_dataset(global_config, modality)
 
@@ -784,7 +796,7 @@ if __name__ == '__main__':
             pool.join()
 
         else:
-            for case in cases:
+            for case in tqdm(cases, desc=f"{modality} cases", leave=False):
                 results = sample_case(case, global_config, out_dir, image_out_dir_train, seg_out_dir_train, image_out_dir_val, seg_out_dir_val, image_out_dir_test, seg_out_dir_test, info_file_name, modality)
 
         if global_config['WRITE_TRAJECTORIES']:
