@@ -110,9 +110,13 @@ Examples:
                        default=False,
                        help='Apply smoothing to surfaces')
     parser.add_argument('--keep_largest', '--keep-largest',
-                       action='store_true',
-                       default=False,
-                       help='Keep only the largest connected component')
+                       type=int,
+                       nargs='?',
+                       const=1,
+                       default=None,
+                       metavar='N',
+                       help='Keep the N largest connected components (default N=1). '
+                            'Example: --keep-largest 2 keeps aorta + cava. Omit flag to keep all components.')
     parser.add_argument('--img_ext', '--img-ext',
                        type=str,
                        default='.mha',
@@ -130,7 +134,7 @@ Examples:
     args = parser.parse_args()
     
     if_smooth = args.smooth
-    if_keep_largest = args.keep_largest
+    keep_largest_n = args.keep_largest
 
     if_spacing_file = args.spacing_file is not None
     spacing_file = args.spacing_file
@@ -229,9 +233,8 @@ Examples:
         # poly = sf.convert_seg_to_surfs(seg, new_spacing=[.5,.5,.5], target_node_num=1e5, bound=False)
         poly = vf.vtk_marching_cube_multi(vf.exportSitk2VTK(seg)[0], 0, rotate=False, center=origin)
 
-        if if_keep_largest:
-            # keep only the largest connected component
-            poly = vf.get_largest_connected_polydata(poly)
+        if keep_largest_n is not None:
+            poly = vf.get_k_largest_connected_polydata(poly, keep_largest_n)
 
         if if_smooth:
             # smooth the surface

@@ -632,6 +632,46 @@ def get_largest_connected_polydata(poly):
     return poly
 
 
+def get_k_largest_connected_polydata(poly, k):
+    """
+    Keep the k largest connected components (by point count) as one vtkPolyData.
+    """
+    if k <= 0:
+        return poly
+    if k == 1:
+        return get_largest_connected_polydata(poly)
+
+    labeler = vtk.vtkPolyDataConnectivityFilter()
+    labeler.SetInputData(poly)
+    labeler.SetExtractionModeToAllRegions()
+    labeler.ColorRegionsOn()
+    labeler.Update()
+    if labeler.GetNumberOfExtractedRegions() == 0:
+        return poly
+
+    labeled = labeler.GetOutput()
+    rid_array = labeled.GetPointData().GetArray('RegionId')
+    if rid_array is None:
+        rid_array = labeled.GetCellData().GetArray('RegionId')
+    if rid_array is None:
+        raise ValueError("Expected RegionId from vtkPolyDataConnectivityFilter (ColorRegionsOn)")
+
+    ids = v2n(rid_array)
+    unique, counts = np.unique(ids, return_counts=True)
+    order = np.argsort(-counts)
+    take = min(k, len(unique))
+    top_regions = [int(unique[order[i]]) for i in range(take)]
+
+    extract = vtk.vtkPolyDataConnectivityFilter()
+    extract.SetInputData(poly)
+    extract.SetExtractionModeToSpecifiedRegions()
+    extract.InitializeSpecifiedRegionList()
+    for rid in top_regions:
+        extract.AddSpecifiedRegion(rid)
+    extract.Update()
+    return extract.GetOutput()
+
+
 def get_seed(cent_fn, centerline_num, point_on_cent):
     """
     Get a location and radius at a point along centerline
