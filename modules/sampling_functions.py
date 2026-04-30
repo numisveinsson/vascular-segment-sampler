@@ -444,6 +444,10 @@ def get_tangent(locs, count):
     """
     Function to calculate the tangent
     """
+    if len(locs) < 2:
+        # Degenerate centerline with a single point; fall back to canonical axis.
+        return np.array([1.0, 0.0, 0.0])
+
     if count == 0:
         tangent = locs[count+1] - locs[count]
     elif count == len(locs)-1:
@@ -484,7 +488,9 @@ def calc_samples(count, bifurc, locs, rads, global_config):
 
     # Calculate vectors
     if not global_config['ROTATE_VOLUMES']:
-        if count < len(locs)/2:
+        if len(locs) < 2:
+            vec0 = np.array([1, 0, 0])
+        elif count < len(locs)/2:
             vec0 = locs[count+1] - locs[count]
         else:
             vec0 = locs[count] - locs[count-1]
@@ -1839,7 +1845,6 @@ def write_vtk_throwout(reader_seg, index_extract, size_extract, out_dir,
 
 def write_subvolume_img(new_img, removed_seg, image_out_dir, seg_out_dir, case_name, N,
               n_old, sub, binarize=True):
-    print(f"Max seg value: {sitk.GetArrayFromImage(removed_seg).max()}")
     sitk.WriteImage(new_img, image_out_dir + case_name + '_' + str(N-n_old) + '_' + str(sub)+'.nii.gz')
     max_seg_value = sitk.GetArrayFromImage(removed_seg).max()
     if max_seg_value != 1 and binarize:
