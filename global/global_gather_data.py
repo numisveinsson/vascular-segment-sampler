@@ -11,6 +11,7 @@ from modules import io
 from modules.sampling_functions import *
 from modules import sitk_functions as sf
 from dataset_dirs.datasets import *
+from preprocessing.change_img_resample import resample_image
 
 now = datetime.now()
 dt_string = now.strftime("_%d_%m_%Y_%H_%M_%S")
@@ -32,6 +33,10 @@ if __name__ == '__main__':
     parser.add_argument('-outdir', '--outdir',
                         type=str,
                         help='Output directory')
+    parser.add_argument('--input_dir', '--input-dir',
+                        type=str,
+                        default=None,
+                        help='Optional input dataset root directory. Overrides DATA_DIR in the config file.')
     parser.add_argument('-config_name', '--config_name',
                         default='global',
                         type=str,
@@ -40,11 +45,21 @@ if __name__ == '__main__':
                         default=1.0,
                         type=float,
                         help='Percentage of dataset to use')
+    parser.add_argument('--target_spacing', '--target-spacing',
+                        type=float,
+                        nargs=3,
+                        default=None,
+                        metavar=('SX', 'SY', 'SZ'),
+                        help='Optional target spacing [sx sy sz] in mm. '
+                             'If set, image is resampled to this spacing and segmentation '
+                             'is resampled to the same reference grid with nearest-neighbor interpolation.')
     args = parser.parse_args()
 
     print(args)
 
     global_config = io.load_yaml("./config/"+args.config_name+".yaml")
+    if args.input_dir is not None:
+        global_config['DATA_DIR'] = args.input_dir
     modalities = global_config['MODALITY']
 
     out_dir = args.outdir  # global_config['OUT_DIR']
@@ -64,7 +79,7 @@ if __name__ == '__main__':
         cases = create_dataset(global_config, modality)
 
         # sort
-        cases = 
+        cases = sorted(cases)
 
         # shuffle cases
         # set random seed
@@ -117,6 +132,20 @@ if __name__ == '__main__':
                 print(e)
                 print('No segmentation found')
                 seg = None
+
+            if args.target_spacing is not None:
+                img = resample_image(img, target_spacing=list(args.target_spacing), order=3)
+                if seg is not None:
+                    # Resample truth onto image reference grid to guarantee matching geometry.
+                    seg = sitk.Resample(
+                        seg,
+                        img,
+                        sitk.Transform(),
+                        sitk.sitkNearestNeighbor,
+                        0,
+                        seg.GetPixelID(),
+                    )
+                size_im = img.GetSize()
 
             # check max and min values of img and seg
             max_val = sitk.GetArrayFromImage(img).max()
