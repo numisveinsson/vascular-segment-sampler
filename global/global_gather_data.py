@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import argparse
+import importlib.util
 import os
 import random
 import subprocess
@@ -16,6 +17,19 @@ from preprocessing.change_img_resample import resample_image
 
 now = datetime.now()
 dt_string = now.strftime("_%d_%m_%Y_%H_%M_%S")
+_CREATE_SEG_SURF_MOD = None
+
+
+def _get_create_seg_surf_mod():
+    """Load global/create_seg_from_surf.py once (directory name `global` is not a package)."""
+    global _CREATE_SEG_SURF_MOD
+    if _CREATE_SEG_SURF_MOD is None:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'create_seg_from_surf.py')
+        spec = importlib.util.spec_from_file_location('create_seg_from_surf', path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _CREATE_SEG_SURF_MOD = mod
+    return _CREATE_SEG_SURF_MOD
 
 if __name__ == '__main__':
     """
@@ -53,7 +67,7 @@ if __name__ == '__main__':
                         metavar=('SX', 'SY', 'SZ'),
                         help='Optional target spacing [sx sy sz] in mm. '
                              'If set, image is resampled to this spacing and segmentation '
-                             'is resampled to the same reference grid with nearest-neighbor interpolation.')
+                             'is regenerated from surface on that grid (no segmentation resampling).')
     parser.add_argument('--convert_nnunet', '--convert-nnunet',
                         action='store_true',
                         help='If set, run dataset_dirs/create_nnunet.py after writing global samples.')
@@ -148,28 +162,34 @@ if __name__ == '__main__':
 
             # Load image and segmentation
             img = sitk.ReadImage(case_dict['IMAGE'])
-            try:
-                seg = sitk.ReadImage(case_dict['SEGMENTATION'])
-                # Make sure segmentation is binary
-                seg = sitk.Cast(seg, sitk.sitkUInt8)
-            except Exception as e:
-                print(e)
-                print('No segmentation found')
-                seg = None
-
             if args.target_spacing is not None:
-                img = resample_image(img, target_spacing=list(args.target_spacing), order=3)
-                if seg is not None:
-                    # Resample truth onto image reference grid to guarantee matching geometry.
-                    seg = sitk.Resample(
-                        seg,
-                        img,
-                        sitk.Transform(),
-                        sitk.sitkNearestNeighbor,
-                        0,
-                        seg.GetPixelID(),
+                # Match main.py behavior: regenerate truth from surface on the target-spacing grid.
+                surf_path = resolve_case_surface_path(global_config['DATA_DIR'], case_dict['NAME'])
+                if surf_path is None:
+                    raise FileNotFoundError(
+                        f"No surface mesh found for case {case_dict['NAME']} under "
+                        f"{global_config['DATA_DIR']}surfaces/ (.vtp or .stl)"
                     )
+                mod = _get_create_seg_surf_mod()
+                surface = mod.load_surface_polydata(surf_path)
+                # Build the exact image grid first, then rasterize truth on this same grid.
+                img = resample_image(img, target_spacing=list(args.target_spacing), order=3)
+                seg = mod.seg_sitk_from_surface_polydata(
+                    surface,
+                    img,
+                    target_spacing=None,
+                    resample_order=3,
+                )
                 size_im = img.GetSize()
+            else:
+                try:
+                    seg = sitk.ReadImage(case_dict['SEGMENTATION'])
+                    # Make sure segmentation is binary
+                    seg = sitk.Cast(seg, sitk.sitkUInt8)
+                except Exception as e:
+                    print(e)
+                    print('No segmentation found')
+                    seg = None
 
             # check max and min values of img and seg
             max_val = sitk.GetArrayFromImage(img).max()
@@ -187,8 +207,10 @@ if __name__ == '__main__':
             if max_val > 1 and seg is not None and global_config['BINARIZE']:
                 seg_np = sitk.GetArrayFromImage(seg)
                 seg_np = seg_np/max_val
-                file_reader = sf.read_image(case_dict['IMAGE'])
-                seg = sf.create_new_from_numpy(file_reader, seg_np)
+                seg = sitk.GetImageFromArray(seg_np)
+                seg.SetSpacing(img.GetSpacing())
+                seg.SetOrigin(img.GetOrigin())
+                seg.SetDirection(img.GetDirection())
                 print('Seg Max value: ', seg_np.max())
                 print('Seg Min value: ', seg_np.min())
                 seg = sitk.Cast(seg, sitk.sitkUInt8)
