@@ -3,6 +3,7 @@ from datetime import datetime
 import argparse
 import os
 import random
+import subprocess
 import SimpleITK as sitk
 import sys
 sys.path.insert(0, './')
@@ -53,6 +54,29 @@ if __name__ == '__main__':
                         help='Optional target spacing [sx sy sz] in mm. '
                              'If set, image is resampled to this spacing and segmentation '
                              'is resampled to the same reference grid with nearest-neighbor interpolation.')
+    parser.add_argument('--convert_nnunet', '--convert-nnunet',
+                        action='store_true',
+                        help='If set, run dataset_dirs/create_nnunet.py after writing global samples.')
+    parser.add_argument('--nnunet_indir', '--nnunet-indir',
+                        type=str,
+                        default=None,
+                        help='Input directory for nnU-Net conversion. Defaults to --outdir.')
+    parser.add_argument('--nnunet_outdir', '--nnunet-outdir',
+                        type=str,
+                        default=None,
+                        help='Output directory for nnU-Net conversion. Defaults to --outdir.')
+    parser.add_argument('--nnunet_name', '--nnunet-name',
+                        type=str,
+                        default='AORTAS',
+                        help='Dataset name prefix for nnU-Net conversion.')
+    parser.add_argument('--nnunet_dataset_number', '--nnunet-dataset-number',
+                        type=int,
+                        default=1,
+                        help='Dataset number for nnU-Net conversion.')
+    parser.add_argument('--nnunet_start_from', '--nnunet-start-from',
+                        type=int,
+                        default=0,
+                        help='Start index for nnU-Net naming (useful when appending).')
     args = parser.parse_args()
 
     print(args)
@@ -179,3 +203,19 @@ if __name__ == '__main__':
                     sitk.WriteImage(seg*255, os.path.join(out_dir, 'vtk_data', 'vtk_mask_'+case_dict['NAME']+'.mha'))
 
             print(f"\n Finished: ' {case_dict['NAME']}, {size_im}")
+
+        if args.convert_nnunet:
+            nnunet_indir = args.nnunet_indir or out_dir
+            nnunet_outdir = args.nnunet_outdir or out_dir
+            cmd = [
+                sys.executable,
+                os.path.join(os.path.dirname(__file__), '..', 'dataset_dirs', 'create_nnunet.py'),
+                '--indir', nnunet_indir,
+                '--outdir', nnunet_outdir,
+                '--name', args.nnunet_name,
+                '--dataset_number', str(args.nnunet_dataset_number),
+                '--modality', modality,
+                '--start_from', str(args.nnunet_start_from),
+            ]
+            print("Running nnU-Net conversion:", " ".join(cmd))
+            subprocess.run(cmd, check=True)
