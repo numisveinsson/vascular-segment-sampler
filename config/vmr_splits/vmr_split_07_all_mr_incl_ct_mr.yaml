@@ -1,6 +1,6 @@
 # Auto-generated — VMR cohort split (test held out in TEST_CASES).
 # All anatomies — MR+CT_MR; TEST = union(individual MR tests) + ~20% stratified remainder per anatomy
-# Cases in cohort: 122; test: 25 (~20%); RNG seed 42.
+# Cases in cohort: 122; test: 22; RNG seed 42.
 # Set DATA_DIR when running. Use DATASET_NAME: 'vmr'.
 
 DATASET_NAME: 'vmr'
@@ -69,27 +69,25 @@ NUMBER_SAMPLES_BIFURC: 3 # 3 how many samples to take if it's a bifurcation
 NUMBER_SAMPLES_START: 3 # 5 how many samples to take at start of vessel (first 5%), better for initialization + bifurcations if not processed
 MOVE_SLOWER_BIFURC: 0.5 # 0.1 how much slower for bigger vessels
 # Held-out test cases (Legacy Name); excluded from training when TESTING is false.
+# Aorta / abdominal aorta tests aligned with config/global_fewer_samples_savio.yaml.
 TEST_CASES:
-  - '0067_0001'
-  - '0075_1001'
+  - '0063_1001'
+  - '0090_0001'
+  - '0131_0000'
+  - '0070_0001'
+  - 'KDR12_aorta'
+  - 'KDR33_aorta'
+  - '0006_0001'
   - '0077_0001'
-  - '0077_1001'
   - '0079_0001'
   - '0083_2002'
   - '0089_1001'
   - '0098_0001'
-  - '0103_0001'
-  - '0110_0001'
-  - '0111_0001'
   - '0112_1001'
   - '0126_0001'
   - '0134_0002'
-  - 'KDR10_aorta'
   - 'KDR12'
   - 'KDR34'
-  - 'KDR34_aorta'
-  - 'P-2'
-  - 'P-8'
   - 'PT1_6M'
   - 'SU0206'
   - 'SU0207'

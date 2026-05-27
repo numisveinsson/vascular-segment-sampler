@@ -31,6 +31,14 @@ def _get_create_seg_surf_mod():
         _CREATE_SEG_SURF_MOD = mod
     return _CREATE_SEG_SURF_MOD
 
+
+def _write_text_lines(filepath, lines):
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines))
+        if lines:
+            f.write('\n')
+
+
 if __name__ == '__main__':
     """
     Does same as gather_sampling_data_parallel.py but for global data
@@ -60,6 +68,13 @@ if __name__ == '__main__':
                         default=1.0,
                         type=float,
                         help='Percentage of dataset to use')
+    parser.add_argument('-testing', '--testing',
+                        action='store_true',
+                        help='Enable testing mode (uses TEST_CASES instead of training cases)')
+    parser.add_argument('-validation_prop', '--validation_prop',
+                        type=float,
+                        default=None,
+                        help='Validation set proportion (0.0-1.0). If not provided, uses config value.')
     parser.add_argument('--target_spacing', '--target-spacing',
                         type=float,
                         nargs=3,
@@ -98,10 +113,23 @@ if __name__ == '__main__':
     global_config = io.load_yaml("./config/"+args.config_name+".yaml")
     if args.input_dir is not None:
         global_config['DATA_DIR'] = args.input_dir
+    if args.testing:
+        global_config['TESTING'] = True
+    elif 'TESTING' not in global_config:
+        global_config['TESTING'] = False
+    if args.validation_prop is not None:
+        global_config['VALIDATION_PROP'] = args.validation_prop
+    elif 'VALIDATION_PROP' not in global_config:
+        global_config['VALIDATION_PROP'] = 0.0
     modalities = global_config['MODALITY']
 
-    out_dir = args.outdir  # global_config['OUT_DIR']
+    out_dir = os.path.abspath(args.outdir)
+    if not out_dir.endswith(os.sep):
+        out_dir = out_dir + os.sep
     global_config['OUT_DIR'] = out_dir
+    output_suffix = global_config.get('OUTPUT_SUFFIX', '')
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
 
     # if not global_config['TESTING']:
     #     test_vars = [False]
@@ -123,11 +151,41 @@ if __name__ == '__main__':
         # set random seed
         random.seed(42)
         random.shuffle(cases)
-        # percentage of dataset to use
-        cases = cases[:int(args.perc_dataset*len(cases))]
+        cases_shuffled = list(cases)
+        n_keep = int(args.perc_dataset * len(cases_shuffled))
+        cases_after_perc = cases_shuffled[:n_keep]
+        cases_excluded_perc = cases_shuffled[n_keep:]
+
+        done_file_path = os.path.join(out_dir, f"done{output_suffix}.txt")
+        if os.path.exists(done_file_path):
+            with open(done_file_path, "r", encoding='utf-8') as f:
+                done = f.read().splitlines()
+            done_set = set(done)
+            skipped_done = [c for c in cases_after_perc if c in done_set]
+            for case in skipped_done:
+                print(f"Skipping {case}")
+            cases = [c for c in cases_after_perc if c not in done_set]
+        else:
+            skipped_done = []
+            cases = cases_after_perc
 
         modality = modality.lower()
-        info_file_name = "info"+'_'+modality+dt_string+".txt"
+        info_file_name = "info" + '_' + modality + dt_string + output_suffix + ".txt"
+
+        if cases_excluded_perc:
+            _write_text_lines(
+                os.path.join(out_dir, f"cases_excluded_perc_dataset_{modality}{dt_string}{output_suffix}.txt"),
+                cases_excluded_perc,
+            )
+        if skipped_done:
+            _write_text_lines(
+                os.path.join(out_dir, f"cases_skipped_done_{modality}{dt_string}{output_suffix}.txt"),
+                skipped_done,
+            )
+        _write_text_lines(
+            os.path.join(out_dir, f"cases_in_run_{modality}{dt_string}{output_suffix}.txt"),
+            cases,
+        )
 
         create_directories(out_dir, modality, global_config)
 
@@ -164,11 +222,12 @@ if __name__ == '__main__':
             img = sitk.ReadImage(case_dict['IMAGE'])
             if args.target_spacing is not None:
                 # Match main.py behavior: regenerate truth from surface on the target-spacing grid.
-                surf_path = resolve_case_surface_path(global_config['DATA_DIR'], case_dict['NAME'])
+                data_dir_ts = os.path.abspath(os.path.expanduser(global_config['DATA_DIR']))
+                surf_path = resolve_case_surface_path(data_dir_ts, case_dict['NAME'])
                 if surf_path is None:
                     raise FileNotFoundError(
                         f"No surface mesh found for case {case_dict['NAME']} under "
-                        f"{global_config['DATA_DIR']}surfaces/ (.vtp or .stl)"
+                        f"{os.path.join(data_dir_ts, 'surfaces')} (.vtp or .stl)"
                     )
                 mod = _get_create_seg_surf_mod()
                 surface = mod.load_surface_polydata(surf_path)
@@ -182,14 +241,38 @@ if __name__ == '__main__':
                 )
                 size_im = img.GetSize()
             else:
-                try:
-                    seg = sitk.ReadImage(case_dict['SEGMENTATION'])
-                    # Make sure segmentation is binary
-                    seg = sitk.Cast(seg, sitk.sitkUInt8)
-                except Exception as e:
-                    print(e)
-                    print('No segmentation found')
-                    seg = None
+                data_dir = os.path.abspath(os.path.expanduser(global_config['DATA_DIR']))
+                seg = None
+                truths_dir = os.path.join(data_dir, 'truths')
+                if os.path.isdir(truths_dir):
+                    seg_path = case_dict['SEGMENTATION']
+                    if os.path.isfile(seg_path):
+                        try:
+                            seg = sitk.ReadImage(seg_path)
+                            seg = sitk.Cast(seg, sitk.sitkUInt8)
+                        except Exception as e:
+                            print(e)
+                            seg = None
+                if seg is None:
+                    surf_path = resolve_case_surface_path(data_dir, case_dict['NAME'])
+                    if surf_path is None:
+                        raise FileNotFoundError(
+                            f"No usable truth for case {case_dict['NAME']}: "
+                            f"truths/ missing or empty, truth file missing or unreadable, and no surface under "
+                            f"{os.path.join(data_dir, 'surfaces')} (.vtp or .stl)"
+                        )
+                    print(
+                        f"{case_dict['NAME']}: segmentation from surface at native image spacing "
+                        f"(truths dir or volume unavailable)"
+                    )
+                    mod = _get_create_seg_surf_mod()
+                    surface = mod.load_surface_polydata(surf_path)
+                    seg = mod.seg_sitk_from_surface_polydata(
+                        surface,
+                        img,
+                        target_spacing=None,
+                        resample_order=3,
+                    )
 
             # check max and min values of img and seg
             max_val = sitk.GetArrayFromImage(img).max()
@@ -225,6 +308,9 @@ if __name__ == '__main__':
                     sitk.WriteImage(seg*255, os.path.join(out_dir, 'vtk_data', 'vtk_mask_'+case_dict['NAME']+'.mha'))
 
             print(f"\n Finished: ' {case_dict['NAME']}, {size_im}")
+
+            with open(done_file_path, "a", encoding='utf-8') as f_done:
+                f_done.write(case_dict['NAME'] + '\n')
 
         if args.convert_nnunet:
             nnunet_indir = args.nnunet_indir or out_dir
