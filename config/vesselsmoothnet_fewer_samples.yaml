@@ -63,19 +63,7 @@ MOVE_SLOWER_BIFURC: 1 # 0.1 how much slower for bigger vessels
 
 # Which cases to use for testing
 TEST_CASES:
-  - '0063_0001'
-  - '0076_1001'
-  - '0083_2002'
-  # - '0100_0002' # No centerline
-  # - '0113_0003' # No centerline
-  # - '0121_0000'
-  - '0134_0002'
-  - '0157_0000'
-  - '0183_1002'
-  - 'KDR32_aorta'
-  - 'O150323_2009_aorta'
-  - 'SU0269'
-
+  - '111111111'
 # Which cases not to use in extraction
 BAD_CASES:
   - '0100_0002' # No centerline

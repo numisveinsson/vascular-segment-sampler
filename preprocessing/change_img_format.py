@@ -211,7 +211,9 @@ Examples:
     logger = get_logger(__name__)
 
     imgs = os.listdir(data_folder)
-    imgs = [f for f in imgs if f.endswith(input_format)]
+    # Skip macOS AppleDouble/resource-fork sidecar files (e.g. "._foo.mha") and
+    # other hidden dotfiles, which are not real images and break SimpleITK.
+    imgs = [f for f in imgs if f.endswith(input_format) and not f.startswith('._')]
 
     # sort the files
     imgs = sorted(imgs)

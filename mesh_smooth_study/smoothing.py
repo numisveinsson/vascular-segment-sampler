@@ -13,6 +13,33 @@ def triangle_mesh(poly):
     return tri.GetOutput()
 
 
+def _bbox_diag(poly):
+    """Bounding-box diagonal length (used to size the hole-fill threshold)."""
+    b = poly.GetBounds()
+    dx, dy, dz = b[1] - b[0], b[3] - b[2], b[5] - b[4]
+    return (dx * dx + dy * dy + dz * dz) ** 0.5
+
+
+def fill_holes(poly, hole_size=None):
+    """Fill boundary holes in a surface before any smoothing.
+
+    Closes open boundaries (e.g. clipped vessel ends, marching-cubes gaps) so that
+    later smoothing does not pull free edges inward. Holes whose size is below
+    ``hole_size`` are filled; the default fills essentially any hole by using a
+    threshold larger than the mesh's bounding-box diagonal. Triangulates the result
+    so downstream Laplacian / cotangent pipelines see triangle cells.
+    """
+    if hole_size is None:
+        diag = _bbox_diag(poly)
+        # Larger than any real hole on the mesh, so all boundaries get capped.
+        hole_size = diag * 10.0 if diag > 0 else 1e6
+    filler = vtk.vtkFillHolesFilter()
+    filler.SetInputData(poly)
+    filler.SetHoleSize(float(hole_size))
+    filler.Update()
+    return triangle_mesh(filler.GetOutput())
+
+
 def laplacian_smooth(poly, iterations=25, relaxation_factor=0.1, boundary_smoothing=True):
     """
     VTK Laplacian smoothing (vtkSmoothPolyDataFilter).

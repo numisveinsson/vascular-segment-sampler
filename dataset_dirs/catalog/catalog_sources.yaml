@@ -1,0 +1,109 @@
+# Dataset descriptors for the SQLite catalog scanner (build_catalog.py).
+#
+# Each entry describes one dataset root laid out the standard way:
+#   <root_path>/images/      <case><img_ext>
+#   <root_path>/truths/      <case><img_ext>
+#   <root_path>/centerlines/ <case>.vtp
+#   <root_path>/surfaces/    <case>.vtp        (optional)
+#
+# Fields:
+#   name        unique catalog name for the dataset
+#   root_path   absolute path to the dataset root (supports ~ expansion)
+#   img_ext     image/segmentation file extension (e.g. .mha, .nrrd, .nii.gz)
+#   source_type 'vmr'   -> join cases to VMR_dataset_names.csv for metadata
+#               'other' -> apply the anatomy/modality defaults below to all cases
+#   anatomy     (other only) default anatomy applied to every case
+#   modality    (other only) default modality applied to every case
+#   notes       (optional) free text
+#
+# Optional per-dataset metadata CSV (works with any source_type, applied on top
+# of vmr/defaults so it overrides any value it provides):
+#   metadata_csv    path to a CSV (absolute, ~, or relative to root_path)
+#   column_map      maps catalog fields -> CSV column names. Must include
+#                   'case_id'. May include any of: anatomy, modality, disease,
+#                   sex, age, species, and 'split' (a column holding train/test).
+#                   CSV columns not referenced here are preserved in source_meta.
+#   split_name      (optional) name for the split this CSV defines
+#                   (defaults to "<name>_csv")
+#   split_value_map (optional) map raw split-column values -> train/test
+#                   (e.g. {0: train, 1: test}); values starting with
+#                   "train"/"test" are recognized automatically.
+#
+# Edit root_path values to match this machine, then run:
+#   python -m dataset_dirs.catalog.build_catalog
+
+datasets:
+  - name: vmr
+    root_path: ~/Documents/datasets/vmr/vmr_all/
+    img_ext: .mha
+    source_type: vmr
+    notes: Vascular Model Repository; metadata joined from VMR_dataset_names.csv
+
+  - name: asoca
+    root_path: ~/Documents/datasets/ASOCA_dataset/cm/
+    img_ext: .mha
+    source_type: other
+    anatomy: Coronary
+    modality: CT
+    notes: ASOCA coronary CT challenge dataset
+
+  - name: miccai_avt
+    root_path: ~/Documents/datasets/MICCAI_Challenge23_Aorta_Tree_Data/
+    img_ext: .nrrd
+    source_type: other
+    anatomy: Aorta
+    modality: CT
+    notes: MICCAI AVT aorta dataset
+
+  - name: parse
+    root_path: ~/Documents/datasets/PARSE_dataset/
+    img_ext: .nii.gz
+    source_type: other
+    anatomy: Pulmonary
+    modality: CT
+    notes: PARSE pulmonary artery dataset
+
+  # - name: TOPCOW_willis_dataset
+  #   root_path: ~/Documents/datasets/TOPCOW_willis_dataset/
+  #   img_ext: .nii.gz
+  #   source_type: other
+  #   anatomy: Willis
+  #   modality: CT
+  #   notes: TOPCOW Willis artery dataset
+
+  # - name: CAS_cerebral_dataset
+  #   root_path: ~/Documents/datasets/CAS_cerebral_dataset/
+  #   img_ext: .nii.gz
+  #   source_type: other
+  #   anatomy: Cerebral
+  #   modality: MR
+  #   notes: CAS cerebral artery dataset
+
+  # - name: CAS_coronary_dataset
+  #   root_path: ~/Documents/datasets/CAS_coronary_dataset/
+  #   img_ext: .nii.gz
+  #   source_type: other
+  #   anatomy: Coronary
+  #   modality: CT
+  #   notes: CAS coronary artery dataset
+
+  # Example: a dataset that ships its own metadata CSV, including a train/test
+  # column. Uncomment and adjust to use.
+  # - name: my_dataset
+  #   root_path: ~/Documents/my_dataset/
+  #   img_ext: .nii.gz
+  #   source_type: other
+  #   anatomy: Cerebral          # default; overridden per-case if CSV maps anatomy
+  #   modality: MR
+  #   metadata_csv: metadata.csv  # relative to root_path
+  #   split_name: my_dataset_official
+  #   column_map:
+  #     case_id: PatientID
+  #     anatomy: Region
+  #     disease: Diagnosis
+  #     sex: Sex
+  #     age: Age
+  #     split: Split             # column whose value is train/test
+  #   # split_value_map:         # only needed if the column isn't train/test text
+  #   #   "0": train
+  #   #   "1": test

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Mesh smoothing study: sweep Laplacian / Taubin / Taubin–cotangent settings on MC surfaces
-and compare to GT smooth surfaces (Dice, ASSD, HD95, normal angular error; Dice by MIS radius).
+and compare to GT smooth surfaces (Dice, ASSD, HD95, normal angular error,
+relative volume / surface-area error; Dice by MIS radius).
 """
 
 from __future__ import annotations
@@ -31,71 +32,35 @@ from mesh_smooth_study import smoothing as S
 
 logger = get_logger(__name__)
 
-# Keep in sync with mesh_smooth_study/default_param_grid.json (or load via --param_grid_json).
+# Selectable metric groups (see --metrics). "dice" also drives radius-stratum Dice.
+# "smoothness" = intrinsic surface roughness of the smoothed mesh (no GT needed).
+ALL_METRICS = ("dice", "distance", "normal", "volume", "surface_area", "smoothness")
+
+# True 2-D exhaustive (Cartesian) sweep per method; kept in sync with
+# mesh_smooth_study/default_param_grid.json. Override either via --param_grid_json.
+_LAPLACIAN_ITERATIONS = (10, 25, 50, 75, 100)
+_LAPLACIAN_RELAXATION = (0.05, 0.1, 0.15, 0.2, 0.25)
+_TAUBIN_ITERATIONS = (10, 25, 50, 75, 100)
+_TAUBIN_SMOOTHING_FACTOR = (0.0, 0.25, 0.5, 0.75, 1.0)
+_TAUBIN_COT_ITERATIONS = (20, 50, 75, 100, 150)
+_TAUBIN_COT_MU1 = (0.45, 0.5, 0.55, 0.6, 0.65)
+
 DEFAULT_PARAM_GRID = {
     "none": [{}],
     "laplacian": [
-        {"iterations": 10, "relaxation_factor": 0.05, "boundary_smoothing": True},
-        {"iterations": 10, "relaxation_factor": 0.1, "boundary_smoothing": True},
-        {"iterations": 15, "relaxation_factor": 0.1, "boundary_smoothing": True},
-        {"iterations": 25, "relaxation_factor": 0.05, "boundary_smoothing": True},
-        {"iterations": 25, "relaxation_factor": 0.1, "boundary_smoothing": True},
-        {"iterations": 25, "relaxation_factor": 0.15, "boundary_smoothing": True},
-        {"iterations": 25, "relaxation_factor": 0.2, "boundary_smoothing": True},
-        {"iterations": 25, "relaxation_factor": 0.25, "boundary_smoothing": True},
-        {"iterations": 40, "relaxation_factor": 0.1, "boundary_smoothing": True},
-        {"iterations": 40, "relaxation_factor": 0.2, "boundary_smoothing": True},
-        {"iterations": 50, "relaxation_factor": 0.1, "boundary_smoothing": True},
-        {"iterations": 50, "relaxation_factor": 0.15, "boundary_smoothing": True},
-        {"iterations": 75, "relaxation_factor": 0.1, "boundary_smoothing": True},
-        {"iterations": 75, "relaxation_factor": 0.2, "boundary_smoothing": True},
-        {"iterations": 100, "relaxation_factor": 0.1, "boundary_smoothing": True},
-        {"iterations": 100, "relaxation_factor": 0.2, "boundary_smoothing": True},
-        {"iterations": 25, "relaxation_factor": 0.1, "boundary_smoothing": False},
-        {"iterations": 50, "relaxation_factor": 0.15, "boundary_smoothing": False},
-        {"iterations": 75, "relaxation_factor": 0.1, "boundary_smoothing": False},
+        {"iterations": it, "relaxation_factor": rf, "boundary_smoothing": True}
+        for it in _LAPLACIAN_ITERATIONS
+        for rf in _LAPLACIAN_RELAXATION
     ],
     "taubin": [
-        {"iterations": 10, "boundary": False, "feature": False, "smoothing_factor": 0.0},
-        {"iterations": 15, "boundary": False, "feature": False, "smoothing_factor": 0.0},
-        {"iterations": 25, "boundary": False, "feature": False, "smoothing_factor": 0.0},
-        {"iterations": 35, "boundary": False, "feature": False, "smoothing_factor": 0.0},
-        {"iterations": 50, "boundary": False, "feature": False, "smoothing_factor": 0.0},
-        {"iterations": 75, "boundary": False, "feature": False, "smoothing_factor": 0.0},
-        {"iterations": 100, "boundary": False, "feature": False, "smoothing_factor": 0.0},
-        {"iterations": 25, "boundary": False, "feature": False, "smoothing_factor": 0.25},
-        {"iterations": 25, "boundary": False, "feature": False, "smoothing_factor": 0.5},
-        {"iterations": 25, "boundary": False, "feature": False, "smoothing_factor": 0.75},
-        {"iterations": 50, "boundary": False, "feature": False, "smoothing_factor": 0.25},
-        {"iterations": 50, "boundary": False, "feature": False, "smoothing_factor": 0.5},
-        {"iterations": 50, "boundary": False, "feature": False, "smoothing_factor": 0.75},
-        {"iterations": 50, "boundary": False, "feature": False, "smoothing_factor": 1.0},
-        {"iterations": 75, "boundary": False, "feature": False, "smoothing_factor": 0.5},
-        {"iterations": 100, "boundary": False, "feature": False, "smoothing_factor": 0.5},
-        {"iterations": 25, "boundary": True, "feature": False, "smoothing_factor": 0.0},
-        {"iterations": 50, "boundary": True, "feature": False, "smoothing_factor": 0.0},
-        {"iterations": 50, "boundary": True, "feature": False, "smoothing_factor": 0.5},
-        {"iterations": 25, "boundary": False, "feature": True, "smoothing_factor": 0.0},
-        {"iterations": 50, "boundary": False, "feature": True, "smoothing_factor": 0.0},
+        {"iterations": it, "boundary": False, "feature": False, "smoothing_factor": sf}
+        for it in _TAUBIN_ITERATIONS
+        for sf in _TAUBIN_SMOOTHING_FACTOR
     ],
     "taubin_cot": [
-        {"iterations": 20, "mu1": 0.5, "mu2": 0.51},
-        {"iterations": 30, "mu1": 0.5, "mu2": 0.51},
-        {"iterations": 50, "mu1": 0.5, "mu2": 0.51},
-        {"iterations": 75, "mu1": 0.5, "mu2": 0.51},
-        {"iterations": 100, "mu1": 0.5, "mu2": 0.51},
-        {"iterations": 150, "mu1": 0.5, "mu2": 0.51},
-        {"iterations": 50, "mu1": 0.45, "mu2": 0.455},
-        {"iterations": 50, "mu1": 0.48, "mu2": 0.52},
-        {"iterations": 50, "mu1": 0.52, "mu2": 0.53},
-        {"iterations": 100, "mu1": 0.48, "mu2": 0.52},
-        {"iterations": 100, "mu1": 0.5, "mu2": 0.505},
-        {"iterations": 75, "mu1": 0.49, "mu2": 0.51},
-        {"iterations": 100, "mu1": 0.45, "mu2": 0.48},
-        {"iterations": 30, "mu1": 0.5, "mu2": 0.52},
-        {"iterations": 50, "mu1": 0.5, "mu2": 0.52},
-        {"iterations": 50, "mu1": 0.47, "mu2": 0.51},
-        {"iterations": 100, "mu1": 0.47, "mu2": 0.51},
+        {"iterations": it, "mu1": mu1, "mu2": round(mu1 + 0.01, 3)}
+        for it in _TAUBIN_COT_ITERATIONS
+        for mu1 in _TAUBIN_COT_MU1
     ],
 }
 
@@ -194,6 +159,41 @@ def _params_sha10(params: dict) -> str:
     return hashlib.sha1(json.dumps(params, sort_keys=True).encode("utf-8")).hexdigest()[:10]
 
 
+# Short, readable names for common smoothing params (others fall back to the raw key).
+_PARAM_NAME_ABBREV = {
+    "iterations": "iters",
+    "relaxation_factor": "relax",
+    "boundary_smoothing": "bnd",
+    "feature": "feat",
+    "feature_angle": "fangle",
+    "pass_band": "pb",
+}
+
+
+def _params_filename_str(params: dict) -> str:
+    """Compact, filesystem-safe encoding of smoothing params for filenames.
+
+    Examples: ``iters100_relax0.05``, ``iters50_mu1-0.5_mu2-0.51``, ``default``.
+    Encodes every key/value, so distinct params never collide.
+    """
+    if not params:
+        return "default"
+
+    parts = []
+    for key, val in sorted(params.items()):
+        name = _PARAM_NAME_ABBREV.get(key, str(key))
+        if isinstance(val, bool):
+            val_str = "on" if val else "off"
+        elif isinstance(val, float):
+            val_str = f"{val:g}"
+        else:
+            val_str = str(val)
+        # Keep alphanumerics, dot and minus (all valid in filenames); drop the rest.
+        safe = "".join(c for c in val_str if c.isalnum() or c in ".-")
+        parts.append(f"{name}{safe}" if name in _PARAM_NAME_ABBREV.values() else f"{name}-{safe}")
+    return "_".join(parts)
+
+
 def _expected_config_keys(methods_and_params: dict[str, list[dict]]) -> set[tuple[str, str]]:
     keys: set[tuple[str, str]] = set()
     for method, param_list in methods_and_params.items():
@@ -211,6 +211,7 @@ def _study_settings_hash(
     radius_bin_edges_mm: np.ndarray | None,
     radius_bin_resolution: str,
     seed: int,
+    metrics: set[str] | None = None,
 ) -> str:
     payload = {
         "dice_spacing_mm": dice_spacing_mm,
@@ -221,6 +222,7 @@ def _study_settings_hash(
         "radius_bin_edges_mm": None if radius_bin_edges_mm is None else radius_bin_edges_mm.tolist(),
         "radius_bin_resolution": radius_bin_resolution,
         "seed": seed,
+        "metrics": sorted(metrics) if metrics else list(ALL_METRICS),
     }
     return hashlib.sha1(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()[:12]
 
@@ -253,6 +255,88 @@ def _atomic_write_csv(df: pd.DataFrame, path: str) -> None:
     tmp.replace(out)
 
 
+def _append_rows_csv(rows: list[dict], path: str) -> int:
+    """Append result rows to the CSV without rewriting existing content.
+
+    Writes the header only when the file is new. If new rows introduce columns not present
+    in the existing header (rare), the file is rewritten once to keep columns aligned.
+    Returns the number of rows appended.
+    """
+    if not rows:
+        return 0
+    out = Path(path).expanduser().resolve()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    new_df = pd.DataFrame(rows)
+    if out.is_file():
+        existing_cols = list(pd.read_csv(out, nrows=0).columns)
+        extra = [c for c in new_df.columns if c not in existing_cols]
+        cols = existing_cols + extra
+        new_df = new_df.reindex(columns=cols)
+        if extra:
+            old = pd.read_csv(out).reindex(columns=cols)
+            full = pd.concat([old, new_df], ignore_index=True)
+            _atomic_write_csv(full, str(out))
+        else:
+            new_df.to_csv(out, mode="a", header=False, index=False)
+    else:
+        new_df.to_csv(out, index=False)
+    return len(new_df)
+
+
+def _done_file_for(out_csv: str) -> str:
+    """Sibling ledger of completed cases for a given results CSV."""
+    p = Path(out_csv)
+    return str(p.with_name(p.stem + ".done.txt"))
+
+
+def _load_done_cases(done_file: str, study_settings_hash: str) -> set[str]:
+    """Read case stems marked done for this settings hash. Lines are 'stem<TAB>settings_hash'."""
+    done: set[str] = set()
+    p = Path(done_file)
+    if not p.is_file():
+        return done
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split("\t")
+        stem = parts[0]
+        h = parts[1] if len(parts) > 1 else ""
+        if h == study_settings_hash:
+            done.add(stem)
+    return done
+
+
+def _mark_case_done(done_file: str, stem: str, study_settings_hash: str) -> None:
+    p = Path(done_file)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "a", encoding="utf-8") as f:
+        f.write(f"{stem}\t{study_settings_hash}\n")
+
+
+def _bbox_diag(poly) -> float:
+    """Bounding-box diagonal length of a polydata (nan if bounds are non-finite)."""
+    b = np.asarray(poly.GetBounds(), dtype=np.float64)
+    if not np.all(np.isfinite(b)):
+        return float("nan")
+    d = np.array([b[1] - b[0], b[3] - b[2], b[5] - b[4]], dtype=np.float64)
+    return float(np.sqrt(np.sum(d * d)))
+
+
+def _smoothing_diverged(poly, ref_diag: float, max_factor: float = 50.0) -> bool:
+    """True if the smoothed mesh exploded (non-finite points or bbox >> the input scale).
+
+    Unstable Taubin / Taubin-cotangent settings can send vertices to ~1e6+, which yields NaN
+    Dice and makes the cell-locator distance queries crawl. We detect that cheaply from bounds.
+    """
+    diag = _bbox_diag(poly)
+    if not np.isfinite(diag):
+        return True
+    if np.isfinite(ref_diag) and ref_diag > 0 and diag > max_factor * ref_diag:
+        return True
+    return False
+
+
 def run_case(
     case_stem: str,
     path_mc: str,
@@ -269,52 +353,120 @@ def run_case(
     seed: int,
     save_smoothed_dir: str | None,
     study_settings_hash: str,
+    metrics: set[str] | None = None,
 ):
+    metrics = set(metrics) if metrics else set(ALL_METRICS)
+    do_dice = "dice" in metrics
+    do_distance = "distance" in metrics
+    do_normal = "normal" in metrics
+    do_volume = "volume" in metrics
+    do_area = "surface_area" in metrics
+    do_smoothness = "smoothness" in metrics
+
     gt_reader = vf.read_geo(path_gt)
     gt_poly = gt_reader.GetOutput()
     mc_reader = vf.read_geo(path_mc)
     mc_poly = mc_reader.GetOutput()
 
+    # Cap open boundaries (clipped ends, MC gaps) before any smoothing so free edges
+    # are not pulled inward by the smoothing passes.
+    mc_poly = S.fill_holes(mc_poly)
+
     cl_pts, cl_radii = (None, None)
     if path_cl and os.path.isfile(path_cl):
         cl_pts, cl_radii = _load_centerline_radii(path_cl)
 
-    lo, hi = M.combined_bounds(gt_poly, mc_poly, margin_mm)
-    ref_im, eff_sp = M.make_reference_image(lo, hi, dice_spacing_mm, dice_max_dim)
-    if eff_sp > float(dice_spacing_mm) * 1.00001:
-        logger.warning(
-            "Case %s: Dice raster spacing raised from %s to %s (dice_max_dim=%s)",
-            case_stem,
-            dice_spacing_mm,
-            eff_sp,
-            dice_max_dim,
-        )
+    # Scale reference for divergence detection: largest of the GT / MC bbox diagonals.
+    ref_diag = max(_bbox_diag(gt_poly), _bbox_diag(mc_poly))
+
+    ref_im, eff_sp = (None, float(dice_spacing_mm))
+    if do_dice:
+        lo, hi = M.combined_bounds(gt_poly, mc_poly, margin_mm)
+        ref_im, eff_sp = M.make_reference_image(lo, hi, dice_spacing_mm, dice_max_dim)
+        if eff_sp > float(dice_spacing_mm) * 1.00001:
+            logger.warning(
+                "Case %s: Dice raster spacing raised from %s to %s (dice_max_dim=%s)",
+                case_stem,
+                dice_spacing_mm,
+                eff_sp,
+                dice_max_dim,
+            )
 
     rows_out = []
 
     for method, param_list in methods_and_params.items():
         for params in param_list:
+            param_str = json.dumps(params, sort_keys=True)
+            params_sha10 = _params_sha10(params)
+
+            nan = float("nan")
+            smoothed = None
+            fail_reason = ""
             try:
                 smoothed = S.apply_method(method, mc_poly, params)
             except Exception as e:
                 logger.exception("Smoothing failed case=%s method=%s params=%s: %s", case_stem, method, params, e)
-                continue
+                fail_reason = "smoothing_error"
 
-            param_str = json.dumps(params, sort_keys=True)
-            params_sha10 = _params_sha10(params)
-            if save_smoothed_dir:
+            if smoothed is not None and save_smoothed_dir:
                 os.makedirs(save_smoothed_dir, exist_ok=True)
+                params_name = _params_filename_str(params)
                 out_vtp = os.path.join(
-                    save_smoothed_dir, f"{case_stem}__{method}__{params_sha10}.vtp"
+                    save_smoothed_dir, f"{case_stem}__{method}__{params_name}.vtp"
                 )
                 vf.write_geo(out_vtp, smoothed)
 
-            gt_vol = M.poly_to_binary_volume(gt_poly, ref_im)
-            pr_vol = M.poly_to_binary_volume(smoothed, ref_im)
-            dice_all = M.dice_binary(gt_vol, pr_vol)
+            diverged = smoothed is not None and _smoothing_diverged(smoothed, ref_diag)
+            if diverged:
+                fail_reason = "diverged"
+                logger.warning(
+                    "Case %s method=%s params=%s: smoothing diverged "
+                    "(bbox diag %.3g vs input %.3g); recording NaN and skipping metrics",
+                    case_stem,
+                    method,
+                    params_sha10,
+                    _bbox_diag(smoothed),
+                    ref_diag,
+                )
+            # A "failed" config is one we could not score: smoothing raised, or the mesh blew up.
+            failed = fail_reason != ""
 
-            assd, hd95, m_ab, m_ba = M.assd_and_hd95(smoothed, gt_poly, n_surface_samples, seed)
-            n_mean, n_max = M.normal_angle_errors_deg(smoothed, gt_poly, n_surface_samples, seed + 17)
+            gt_vol = pr_vol = fg = None
+            dice_all = nan
+            if do_dice and not failed:
+                gt_vol = M.poly_to_binary_volume(gt_poly, ref_im)
+                pr_vol = M.poly_to_binary_volume(smoothed, ref_im)
+                dice_all = M.dice_binary(gt_vol, pr_vol)
+                fg = gt_vol | pr_vol
+
+            assd = hd95 = m_ab = m_ba = nan
+            if do_distance and not failed:
+                assd, hd95, m_ab, m_ba = M.assd_and_hd95(smoothed, gt_poly, n_surface_samples, seed)
+
+            n_mean = n_max = nan
+            if do_normal and not failed:
+                n_mean, n_max = M.normal_angle_errors_deg(smoothed, gt_poly, n_surface_samples, seed + 17)
+
+            vol_err = (
+                M.volume_error_metrics(gt_poly, smoothed)
+                if do_volume and not failed
+                else {"volume_gt": nan, "volume_pred": nan, "volume_error_abs": nan, "volume_error_rel": nan}
+            )
+            area_err = (
+                M.surface_area_error_metrics(gt_poly, smoothed)
+                if do_area and not failed
+                else {
+                    "surface_area_gt": nan,
+                    "surface_area_pred": nan,
+                    "surface_area_error_abs": nan,
+                    "surface_area_error_rel": nan,
+                }
+            )
+            smooth_m = (
+                M.smoothness_metrics(smoothed)
+                if do_smoothness and not failed
+                else {"mean_curvature_rms": nan, "dihedral_angle_p95_deg": nan}
+            )
 
             base_row = {
                 "case_id": case_stem,
@@ -322,6 +474,10 @@ def run_case(
                 "params_json": param_str,
                 "params_sha10": params_sha10,
                 "study_settings_hash": study_settings_hash,
+                "metrics": ",".join(sorted(metrics)),
+                "diverged": bool(diverged),
+                "failed": bool(failed),
+                "fail_reason": fail_reason,
                 "radius_bin_resolution": radius_bin_resolution,
                 "radius_bin_edges_json": (
                     json.dumps(radius_bin_edges_mm.tolist()) if radius_bin_edges_mm is not None else ""
@@ -336,10 +492,20 @@ def run_case(
                 "mean_directed_dist_gt_to_pred_mm": m_ba,
                 "normal_error_mean_deg": n_mean,
                 "normal_error_max_deg": n_max,
+                "volume_gt": vol_err["volume_gt"],
+                "volume_pred": vol_err["volume_pred"],
+                "volume_error_abs": vol_err["volume_error_abs"],
+                "volume_error_rel": vol_err["volume_error_rel"],
+                "surface_area_gt": area_err["surface_area_gt"],
+                "surface_area_pred": area_err["surface_area_pred"],
+                "surface_area_error_abs": area_err["surface_area_error_abs"],
+                "surface_area_error_rel": area_err["surface_area_error_rel"],
+                "mean_curvature_rms": smooth_m["mean_curvature_rms"],
+                "dihedral_angle_p95_deg": smooth_m["dihedral_angle_p95_deg"],
             }
 
-            fg = gt_vol | pr_vol
-            if cl_pts is None or cl_radii is None or radius_bin_resolution == "off":
+            do_radius_strata = do_dice and fg is not None
+            if not do_radius_strata or cl_pts is None or cl_radii is None or radius_bin_resolution == "off":
                 do_radius_strata = False
             elif radius_bin_resolution in ("fixed", "global_quantile"):
                 do_radius_strata = (
@@ -363,10 +529,27 @@ def run_case(
                 "radius_bin": -1,
                 "radius_bin_label": "overall",
                 "dice": dice_all,
-                "n_voxels": int(np.count_nonzero(fg)),
+                "n_voxels": int(np.count_nonzero(fg)) if fg is not None else -1,
                 "metric_scope": "overall",
             }
             rows_out.append(base_row_overall)
+
+            logger.info(
+                "  %s/%s %s | Dice=%.4f ASSD=%.4g HD95=%.4g normal(mean/max)=%.2f/%.2f deg "
+                "dV_rel=%+.3f dS_rel=%+.3f Hrms=%.4g dihedral_p95=%.2f deg",
+                case_stem,
+                method,
+                params_sha10,
+                dice_all,
+                assd,
+                hd95,
+                n_mean,
+                n_max,
+                vol_err["volume_error_rel"],
+                area_err["surface_area_error_rel"],
+                smooth_m["mean_curvature_rms"],
+                smooth_m["dihedral_angle_p95_deg"],
+            )
 
     return rows_out
 
@@ -397,6 +580,7 @@ def _mp_case_worker(task: dict) -> tuple[str, list, str | None]:
             int(task["seed"]),
             task["save_smoothed_dir"],
             str(task["study_settings_hash"]),
+            set(task["metrics"]),
         )
         return stem, rows, None
     except Exception:
@@ -437,6 +621,17 @@ def main():
         type=str,
         default="laplacian,taubin,taubin_cot",
         help="Comma-separated: none, laplacian, taubin, taubin_cot",
+    )
+    parser.add_argument(
+        "--metrics",
+        type=str,
+        default="all",
+        help="Comma-separated metric groups to compute: all, or any of "
+        f"{','.join(ALL_METRICS)}. 'dice' = volumetric Dice (and radius-stratum Dice with "
+        "--centerline_dir); 'distance' = ASSD/HD95; 'normal' = normal angle error; "
+        "'volume' / 'surface_area' = relative volume / surface-area error; "
+        "'smoothness' = area-weighted RMS mean curvature and 95th-pct adjacent-face "
+        "dihedral angle of the smoothed mesh. Unselected metrics are written as NaN.",
     )
     parser.add_argument(
         "--param_grid_json",
@@ -531,7 +726,8 @@ def main():
     parser.add_argument(
         "--no_skip",
         action="store_true",
-        help="Recompute every case even if present in --out_csv with matching settings",
+        help="Recompute every case even if listed as done for the current settings hash. "
+        "Appends new rows (does not delete prior rows for the case).",
     )
     parser.add_argument(
         "--np",
@@ -562,6 +758,16 @@ def main():
     if missing:
         raise SystemExit(f"Unknown method(s) {missing}. Known: {list(grid.keys())}")
 
+    metric_tokens = [m.strip().lower() for m in args.metrics.split(",") if m.strip()]
+    if not metric_tokens or "all" in metric_tokens:
+        metrics = set(ALL_METRICS)
+    else:
+        metrics = set(metric_tokens)
+        bad = sorted(metrics - set(ALL_METRICS))
+        if bad:
+            raise SystemExit(f"Unknown metric(s) {bad}. Known: all,{','.join(ALL_METRICS)}")
+    logger.info("Computing metrics: %s", ",".join(sorted(metrics)))
+
     gt_files = _list_vtp(args.gt_dir)
     mc_files = _list_vtp(args.mc_dir)
     gt_set = set(gt_files)
@@ -590,13 +796,25 @@ def main():
         radius_edges,
         radius_mode,
         args.seed,
+        metrics,
     )
 
     out_csv = str(Path(args.out_csv).expanduser().resolve())
-    if os.path.isfile(out_csv):
-        df = pd.read_csv(out_csv)
-    else:
-        df = pd.DataFrame()
+    done_file = str(Path(_done_file_for(out_csv)).expanduser().resolve())
+
+    # Bootstrap the ledger from a pre-existing CSV (older runs without a done.txt) so we can
+    # resume them without recomputation.
+    if not os.path.isfile(done_file) and os.path.isfile(out_csv):
+        try:
+            old_df = pd.read_csv(out_csv)
+            for stem in sorted(set(old_df.get("case_id", pd.Series(dtype=str)).astype(str))):
+                if _case_already_complete(old_df, stem, expected_keys, settings_hash):
+                    _mark_case_done(done_file, stem, settings_hash)
+            logger.info("Bootstrapped %s from existing CSV", done_file)
+        except Exception as e:
+            logger.warning("Could not bootstrap done file from CSV: %s", e)
+
+    done_cases = _load_done_cases(done_file, settings_hash)
 
     def _paths_for(fname: str) -> tuple[str, str, str, str | None]:
         stem = Path(fname).stem
@@ -614,8 +832,8 @@ def main():
     tasks: list[dict] = []
     for fname in common:
         stem, path_gt, path_mc, path_cl = _paths_for(fname)
-        if not args.no_skip and _case_already_complete(df, stem, expected_keys, settings_hash):
-            logger.info("Case %s — skip (already in CSV for this settings hash)", stem)
+        if not args.no_skip and stem in done_cases:
+            logger.info("Case %s — skip (in %s for this settings hash)", stem, os.path.basename(done_file))
             continue
         save_sub = os.path.join(args.save_smoothed_dir, stem) if args.save_smoothed_dir else None
         tasks.append(
@@ -635,9 +853,11 @@ def main():
                 "seed": args.seed,
                 "save_smoothed_dir": save_sub,
                 "study_settings_hash": settings_hash,
+                "metrics": sorted(metrics),
             }
         )
 
+    total_rows = 0
     if args.num_workers <= 1:
         for task in tasks:
             stem = task["case_stem"]
@@ -658,12 +878,13 @@ def main():
                 args.seed,
                 task["save_smoothed_dir"],
                 settings_hash,
+                metrics,
             )
-            if not df.empty and "case_id" in df.columns:
-                df = df[df["case_id"] != stem]
-            df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
-            _atomic_write_csv(df, out_csv)
-            logger.info("Case %s — wrote CSV (%d total rows)", stem, len(df))
+            n = _append_rows_csv(rows, out_csv)
+            total_rows += n
+            _mark_case_done(done_file, stem, settings_hash)
+            done_cases.add(stem)
+            logger.info("Case %s — appended %d rows (%d this run)", stem, n, total_rows)
     else:
         logger.info("Running %d cases on %d workers", len(tasks), args.num_workers)
         try:
@@ -672,20 +893,23 @@ def main():
                     if err:
                         logger.error("Case %s failed:\n%s", stem, err)
                         continue
-                    logger.info("Case %s — finished (%d rows)", stem, len(rows))
-                    if not df.empty and "case_id" in df.columns:
-                        df = df[df["case_id"] != stem]
-                    df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
-                    _atomic_write_csv(df, out_csv)
-                    logger.info("Case %s — wrote CSV (%d total rows)", stem, len(df))
+                    n = _append_rows_csv(rows, out_csv)
+                    total_rows += n
+                    _mark_case_done(done_file, stem, settings_hash)
+                    done_cases.add(stem)
+                    logger.info("Case %s — finished, appended %d rows (%d this run)", stem, n, total_rows)
         except KeyboardInterrupt:
             logger.warning("Interrupted; pool terminated")
             raise
 
-    logger.info("Finished all cases: %d rows in %s", len(df), out_csv)
+    logger.info("Finished: appended %d rows this run to %s (%d cases done)", total_rows, out_csv, len(done_cases))
 
     if args.out_plots_dir:
-        from mesh_smooth_study.plots import generate_study_plots
+        from mesh_smooth_study.plots import generate_study_plots, write_summary_csv
+
+        summary_path = write_summary_csv(out_csv, os.path.join(args.out_plots_dir, "summary.csv"))
+        if summary_path is not None:
+            logger.info("Wrote summary %s", summary_path)
 
         plot_paths = generate_study_plots(
             out_csv,

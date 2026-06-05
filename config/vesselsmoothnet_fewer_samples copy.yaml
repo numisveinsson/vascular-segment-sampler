@@ -1,19 +1,17 @@
-
-# '/global/scratch/users/numi/vascular_data_3d/'
-# '/Users/numisveins/Documents/ASOCA_dataset/', MICCAI_AVT_Data
-# DATA_DIR: '/Users/numisveins/Documents/vascular_data_3d/' #, MICCAI_AVT_Data
+# DATA_DIR: '/Users/nsveinsson/Documents/datasets/vmr/' #, MICCAI_AVT_Data
 
 DATASET_NAME: 'other' #'vmr' # or other 'other'
+VALIDATION_PROP: 0.1
 
-IMG_EXT: '.nrrd'
+IMG_EXT: '.mha' #'.nii.gz' #'.mha' #'.nii.gz' #'.mha' #'.nii.gz' # Image file extension
 
-BINARIZE: False
-ANATOMY: ['Aorta'] # can be 'ALL' or ['Aorta', 'Abdominal Aorta', 'Pulmonary', 'Coronary', 'CHD', 'Cerebro']
+BINARIZE: True # Need true for VMR since 255 labels
+ANATOMY: ['ALL'] # can be 'ALL' or ['Aorta', 'Abdominal Aorta', 'Pulmonary', 'Coronary', 'CHD', 'Cerebro']
 OUTLET_CLASSES: [0,1,2,3,4,5,6,7,8,9,10]
 SCALED: False
 CROPPED: False
 
-EXTRACT_VOLUMES: True
+EXTRACT_VOLUMES: False
 ROTATE_VOLUMES: False
 
 RESAMPLE_VOLUMES: False
@@ -23,9 +21,9 @@ RESAMPLE_SIZE: [64, 64, 64]
 AUGMENT_VOLUMES: False
 
 WRITE_SAMPLES: True
-WRITE_IMG: True
+WRITE_IMG: False
 REMOVE_OTHER: False # Remove other unconnected vessels in gt volume, can cause problems where vessels are close
-WRITE_SURFACE: False
+WRITE_SURFACE: True
 WRITE_CENTERLINE: False
 WRITE_VOXEL_PYRAMID: False
 
@@ -47,13 +45,13 @@ WRITE_VTK_THROWOUT: False
 
 MOVE_DIST: 2 # 1.5 how far to move along centerline between sampling, in terms of radius
 SIZE_RADIUS: 5 # how big a volume to sample, x radius at each location
-RADIUS_ADD: 0 # how much to add to radius values (to correct bias) done before scale
+RADIUS_ADD: 0.05 # how much to add to radius values (to correct bias) done before scale
 RADIUS_SCALE: 1 # how much to add to radius values (to correct bias)
-MIN_DIM: 5 # minimum number of voxels in each dimension for subvolume extraction
 
 CAPFREE: False # whether to require a certain amount of cap-free volume
 CAPFREE_PROP: 0.0 # how much of volume must be cap free, per sidelength
-MOVE_SLOWER_LARGE: 1  #0.5 how much slower for bigger vessels
+MIN_DIM: 5 # minimum number of voxels in each dimension for subvolume extraction
+MOVE_SLOWER_LARGE: 0.5  #0.5 how much slower for bigger vessels
 MU_SIZE: 5 # mean for subvolume-radius ratio
 SIGMA_SIZE: 0.8 # standard deviation for subvolume-radius ratio
 MU_SHIFT: 0 # mean for subvolume shift off centerline
@@ -65,91 +63,23 @@ MOVE_SLOWER_BIFURC: 1 # 0.1 how much slower for bigger vessels
 
 # Which cases to use for testing
 TEST_CASES:
-  - '0176_0000' # Aorta CT
-  - '0174_0000' # Aorta CT
-  - '0188_0001_aorta' # Aorta CT
-  - 'O150323_2009_aorta' # Aorta CT
-  - 'O344211000_2006_aorta' # Aorta CT
-  - '0141_1001' # Aortofemoral CT
-  - '0146_1001' # Aortofemoral CT
-  - '0139_1001' # Aortofemoral CT
-
-  - '0002_0001' # Coronary CT
-  - '0005_1001' # Pulmonary CT
-
-  - '0063_1001' # Aortic MR
-  - '0090_0001' # Aortic MR
-  - '0131_0000' # Aortic MR
-  - '0070_0001' # Aortic MR
-  - 'KDR12_aorta' # Aortic MR
-  - 'KDR33_aorta' # Aortic MR
-  - '0006_0001' # Aortofemoral MR
-
-  - '0085_1001' # Pulmonary MR
-  - '0081_0001' # Pulmonary MR
-
-# miccai aortas
-  - 'R2' # no centerline
-  - 'R5' # no centerline
-  - 'R13' # no centerline
-  - 'K5' # no centerline
-  - 'R18' # with centerline
-  - 'D11' # with centerline
-  - 'D10' # with centerline
-  - 'K11' # with centerline
-  - 'K10' # with centerline
-
-  # asoca
-  - '00'
-  - '01'
-  - '02'
-  - '03'
-  - '04'
-  - '05'
-  - '06'
-  - '07'
-  - '08'
-  - '09'
-  - '10'
-  - '11'
-  - '12'
-  - '13'
-  - '14'
-  - '15'
-  - '16'
-  - '17'
-  - '18'
-  - '19'
-  - 'Normal_14'
-  - 'Diseased_16'
-  - 'Diseased_3'
-  - 'Diseased_1'
-  - 'Normal_11'
-  - 'Diseased_8'
-  - 'Diseased_4'
-  - 'Normal_16'
-  - 'Normal_9'
-  - 'Diseased_10'
-  
-# PARSE
-  - 'PA000198'
-  - 'PA000107'
-  - 'PA000127'
-  - 'PA000005'
-  - 'PA000292'
-  - 'PA000099'
-  - 'PA000217'
-  - 'PA000305'
-  - 'PA000133'
-  - 'PA000144'
-  - 'PA000313'
-  - 'PA000128'
-  - 'PA000301'
-  - 'PA000118'
-  - 'PA000027'
+  - '0063_0001'
+  - '0076_1001'
+  - '0083_2002'
+  # - '0100_0002' # No centerline
+  # - '0113_0003' # No centerline
+  # - '0121_0000'
+  - '0134_0002'
+  - '0157_0000'
+  - '0183_1002'
+  - 'KDR32_aorta'
+  - 'O150323_2009_aorta'
+  - 'SU0269'
 
 # Which cases not to use in extraction
 BAD_CASES:
+  - '0100_0002' # No centerline
+  - '0113_0003' # No centerline
   - '0092_0001' # Aorta with weird dimensions
   - '0064_1001' # Aorta with additional vessels
   - '0065_1001' # Aorta with additional vessels

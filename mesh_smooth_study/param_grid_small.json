@@ -1,0 +1,39 @@
+{
+  "none": [{}],
+  "laplacian": [
+    {"iterations": 25, "relaxation_factor": 0.01, "boundary_smoothing": true},
+    {"iterations": 50, "relaxation_factor": 0.01, "boundary_smoothing": true},
+    {"iterations": 75, "relaxation_factor": 0.01, "boundary_smoothing": true},
+    {"iterations": 100, "relaxation_factor": 0.01, "boundary_smoothing": true},
+    {"iterations": 150, "relaxation_factor": 0.01, "boundary_smoothing": true},
+    {"iterations": 200, "relaxation_factor": 0.01, "boundary_smoothing": true}
+  ],
+  "taubin": [
+    {"iterations": 25, "boundary": false, "feature": false, "smoothing_factor": 0.1},
+    {"iterations": 25, "boundary": false, "feature": false, "smoothing_factor": 0.25},
+    {"iterations": 25, "boundary": false, "feature": false, "smoothing_factor": 0.5},
+    {"iterations": 50, "boundary": false, "feature": false, "smoothing_factor": 0.1},
+    {"iterations": 50, "boundary": false, "feature": false, "smoothing_factor": 0.25},
+    {"iterations": 50, "boundary": false, "feature": false, "smoothing_factor": 0.5}
+  ],
+  "taubin_cot": [
+    {"iterations": 30, "mu1": 0.3, "mu2": 0.31},
+    {"iterations": 30, "mu1": 0.5, "mu2": 0.51},
+    {"iterations": 30, "mu1": 0.7, "mu2": 0.71},
+    {"iterations": 50, "mu1": 0.3, "mu2": 0.31},
+    {"iterations": 50, "mu1": 0.5, "mu2": 0.51},
+    {"iterations": 50, "mu1": 0.7, "mu2": 0.71},
+    {"iterations": 75, "mu1": 0.3, "mu2": 0.31},
+    {"iterations": 75, "mu1": 0.5, "mu2": 0.51},
+    {"iterations": 75, "mu1": 0.7, "mu2": 0.71},
+    {"iterations": 100, "mu1": 0.3, "mu2": 0.31},
+    {"iterations": 100, "mu1": 0.5, "mu2": 0.51},
+    {"iterations": 100, "mu1": 0.7, "mu2": 0.71},
+    {"iterations": 150, "mu1": 0.3, "mu2": 0.31},
+    {"iterations": 150, "mu1": 0.5, "mu2": 0.51},
+    {"iterations": 150, "mu1": 0.7, "mu2": 0.71},
+    {"iterations": 200, "mu1": 0.3, "mu2": 0.31},
+    {"iterations": 200, "mu1": 0.5, "mu2": 0.51},
+    {"iterations": 200, "mu1": 0.7, "mu2": 0.71}
+  ]
+}

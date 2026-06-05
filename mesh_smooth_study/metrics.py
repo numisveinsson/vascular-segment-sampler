@@ -1,4 +1,5 @@
-"""Surface and volume metrics: Dice (optionally by MIS radius bin), ASSD, HD95, normal angular error."""
+"""Surface and volume metrics: Dice (optionally by MIS radius bin), ASSD, HD95, normal angular
+error, mesh volume / surface-area and their relative errors."""
 
 from __future__ import annotations
 
@@ -163,6 +164,243 @@ def poly_to_binary_volume(poly, ref_im):
     dims = ref_im.GetDimensions()
     vol = arr.reshape(dims[0], dims[1], dims[2], order="F") > 0
     return vol
+
+
+def mesh_volume(poly: vtk.vtkPolyData) -> float:
+    """Volume enclosed by a closed triangulated surface (mesh units cubed).
+
+    Uses vtkMassProperties. Returns nan if the mesh has no cells or computation fails.
+    """
+    if poly is None or poly.GetNumberOfCells() == 0:
+        return float("nan")
+    try:
+        mass = vtk.vtkMassProperties()
+        mass.SetInputData(poly)
+        mass.Update()
+        return float(mass.GetVolume())
+    except Exception:
+        return float("nan")
+
+
+def mesh_surface_area(poly: vtk.vtkPolyData) -> float:
+    """Surface area of a triangulated mesh (mesh units squared).
+
+    Uses vtkMassProperties. Returns nan if the mesh has no cells or computation fails.
+    """
+    if poly is None or poly.GetNumberOfCells() == 0:
+        return float("nan")
+    try:
+        mass = vtk.vtkMassProperties()
+        mass.SetInputData(poly)
+        mass.Update()
+        return float(mass.GetSurfaceArea())
+    except Exception:
+        return float("nan")
+
+
+def volume_error_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData) -> dict:
+    """Volume of each mesh and signed / relative error between them.
+
+    Keys: volume_gt, volume_pred, volume_error_abs (pred - gt),
+    volume_error_rel ((pred - gt) / gt, nan if gt == 0).
+    """
+    v_gt = mesh_volume(gt_poly)
+    v_pred = mesh_volume(pred_poly)
+    err_abs = float("nan")
+    err_rel = float("nan")
+    if np.isfinite(v_gt) and np.isfinite(v_pred):
+        err_abs = v_pred - v_gt
+        if v_gt != 0:
+            err_rel = err_abs / v_gt
+    return {
+        "volume_gt": v_gt,
+        "volume_pred": v_pred,
+        "volume_error_abs": err_abs,
+        "volume_error_rel": err_rel,
+    }
+
+
+def surface_area_error_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData) -> dict:
+    """Surface area of each mesh and signed / relative error between them.
+
+    Keys: surface_area_gt, surface_area_pred, surface_area_error_abs (pred - gt),
+    surface_area_error_rel ((pred - gt) / gt, nan if gt == 0).
+    """
+    a_gt = mesh_surface_area(gt_poly)
+    a_pred = mesh_surface_area(pred_poly)
+    err_abs = float("nan")
+    err_rel = float("nan")
+    if np.isfinite(a_gt) and np.isfinite(a_pred):
+        err_abs = a_pred - a_gt
+        if a_gt != 0:
+            err_rel = err_abs / a_gt
+    return {
+        "surface_area_gt": a_gt,
+        "surface_area_pred": a_pred,
+        "surface_area_error_abs": err_abs,
+        "surface_area_error_rel": err_rel,
+    }
+
+
+def _triangle_faces(poly: vtk.vtkPolyData) -> np.ndarray:
+    """(F, 3) int vertex indices for a *triangulated* polydata (empty if none).
+
+    Assumes every polygon is a triangle (run vtkTriangleFilter first); falls back to a
+    safe per-cell parse if the connectivity stream is not uniform 3-vertex cells.
+    """
+    polys = poly.GetPolys()
+    if polys is None or polys.GetNumberOfCells() == 0:
+        return np.zeros((0, 3), dtype=np.int64)
+    data = np.asarray(v2n(polys.GetData()), dtype=np.int64).ravel()
+    if data.size % 4 == 0:
+        m = data.reshape(-1, 4)
+        if np.all(m[:, 0] == 3):
+            return m[:, 1:4].copy()
+    faces: list[list[int]] = []
+    i = 0
+    n = data.size
+    while i < n:
+        k = int(data[i])
+        if k == 3 and i + 3 < n:
+            faces.append([int(data[i + 1]), int(data[i + 2]), int(data[i + 3])])
+        i += k + 1
+    return np.asarray(faces, dtype=np.int64) if faces else np.zeros((0, 3), dtype=np.int64)
+
+
+def _triangulate(poly: vtk.vtkPolyData) -> vtk.vtkPolyData:
+    tri = vtk.vtkTriangleFilter()
+    tri.SetInputData(poly)
+    tri.Update()
+    return tri.GetOutput()
+
+
+def mean_curvature_rms_area_weighted(poly: vtk.vtkPolyData) -> float:
+    """Area-weighted RMS of per-vertex mean curvature (units: 1 / mesh length).
+
+    Mean curvature H is computed per vertex with ``vtkCurvatures`` and weighted by the
+    vertex's barycentric area (a third of its incident triangle areas), so dense regions
+    do not dominate::
+
+        rms = sqrt( sum_i w_i * H_i^2 / sum_i w_i )
+
+    Larger values indicate a rougher / more wrinkled surface. Returns nan if the mesh is
+    empty or curvature cannot be computed.
+    """
+    if poly is None or poly.GetNumberOfCells() == 0:
+        return float("nan")
+    try:
+        surf = _triangulate(poly)
+        if surf.GetNumberOfCells() == 0:
+            return float("nan")
+        cc = vtk.vtkCurvatures()
+        cc.SetInputData(surf)
+        if hasattr(cc, "SetCurvatureTypeToMean"):
+            cc.SetCurvatureTypeToMean()
+        else:
+            cc.SetCurvatureType(0)
+        cc.Update()
+        out = cc.GetOutput()
+        arr = out.GetPointData().GetArray("Mean_Curvature")
+        if arr is None:
+            return float("nan")
+        H = np.asarray(v2n(arr), dtype=np.float64).ravel()
+        verts = np.asarray(v2n(surf.GetPoints().GetData()), dtype=np.float64)
+        faces = _triangle_faces(surf)
+        if faces.size == 0 or verts.shape[0] != H.shape[0]:
+            return float("nan")
+
+        v0 = verts[faces[:, 0]]
+        v1 = verts[faces[:, 1]]
+        v2 = verts[faces[:, 2]]
+        cp = np.cross(v1 - v0, v2 - v0)
+        tri_area = 0.5 * np.sqrt(np.maximum(np.sum(cp * cp, axis=1), 0.0))
+        good_tri = np.isfinite(tri_area) & (tri_area > 0)
+        if not np.any(good_tri):
+            return float("nan")
+        faces = faces[good_tri]
+        tri_area = tri_area[good_tri]
+
+        w = np.zeros(verts.shape[0], dtype=np.float64)
+        contrib = tri_area / 3.0
+        np.add.at(w, faces[:, 0], contrib)
+        np.add.at(w, faces[:, 1], contrib)
+        np.add.at(w, faces[:, 2], contrib)
+
+        m = np.isfinite(H) & np.isfinite(w) & (w > 0)
+        wsum = float(np.sum(w[m]))
+        if not np.any(m) or wsum <= 0:
+            return float("nan")
+        return float(np.sqrt(np.sum(w[m] * H[m] * H[m]) / wsum))
+    except Exception:
+        return float("nan")
+
+
+def dihedral_angle_percentile_deg(poly: vtk.vtkPolyData, percentile: float = 95.0) -> float:
+    """High-percentile dihedral angle between adjacent triangle faces (degrees).
+
+    For every interior edge shared by two triangles, the dihedral *deviation* angle is the
+    angle between the two face normals (0 on a flat surface). The given ``percentile`` (95th
+    by default) of those angles summarizes the worst-case local faceting / roughness while
+    ignoring the few most extreme edges. Returns nan if the mesh has no shared edges.
+    """
+    if poly is None or poly.GetNumberOfCells() == 0:
+        return float("nan")
+    try:
+        surf = _triangulate(poly)
+        verts = np.asarray(v2n(surf.GetPoints().GetData()), dtype=np.float64)
+        faces = _triangle_faces(surf)
+        if faces.size == 0:
+            return float("nan")
+
+        v0 = verts[faces[:, 0]]
+        v1 = verts[faces[:, 1]]
+        v2 = verts[faces[:, 2]]
+        nrm = np.cross(v1 - v0, v2 - v0)
+        nl = np.sqrt(np.sum(nrm * nrm, axis=1))
+        ok = nl > 1e-20
+        unit = np.zeros_like(nrm)
+        unit[ok] = nrm[ok] / nl[ok][:, None]
+
+        n_faces = faces.shape[0]
+        edges = np.concatenate([faces[:, [0, 1]], faces[:, [1, 2]], faces[:, [2, 0]]], axis=0)
+        edges = np.sort(edges, axis=1)
+        face_of_edge = np.tile(np.arange(n_faces, dtype=np.int64), 3)
+
+        order = np.lexsort((edges[:, 1], edges[:, 0]))
+        edges = edges[order]
+        face_of_edge = face_of_edge[order]
+
+        same = np.all(edges[1:] == edges[:-1], axis=1)
+        pos = np.flatnonzero(same)
+        if pos.size == 0:
+            return float("nan")
+        f0 = face_of_edge[pos]
+        f1 = face_of_edge[pos + 1]
+        valid = ok[f0] & ok[f1]
+        f0 = f0[valid]
+        f1 = f1[valid]
+        if f0.size == 0:
+            return float("nan")
+
+        dots = np.clip(np.sum(unit[f0] * unit[f1], axis=1), -1.0, 1.0)
+        ang = np.degrees(np.arccos(dots))
+        if ang.size == 0:
+            return float("nan")
+        return float(np.percentile(ang, float(percentile)))
+    except Exception:
+        return float("nan")
+
+
+def smoothness_metrics(poly: vtk.vtkPolyData) -> dict:
+    """Intrinsic surface-smoothness metrics for a single mesh (no reference needed).
+
+    Keys: mean_curvature_rms (area-weighted RMS mean curvature, 1/length),
+    dihedral_angle_p95_deg (95th-percentile adjacent-face dihedral angle, degrees).
+    """
+    return {
+        "mean_curvature_rms": mean_curvature_rms_area_weighted(poly),
+        "dihedral_angle_p95_deg": dihedral_angle_percentile_deg(poly, 95.0),
+    }
 
 
 def dice_binary(gt: np.ndarray, pred: np.ndarray) -> float:
