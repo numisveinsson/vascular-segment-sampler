@@ -154,12 +154,12 @@ Examples:
   python change_img_resample.py --target_spacing 1.0 1.0 1.0
         """
     )
-    parser.add_argument('--input_dir', '--input-dir',
+    parser.add_argument('-i', '--input_dir', '--input-dir',
                        type=str,
                        default=None,
                        help='Directory containing input images. '
                             'Defaults to ./data/images/')
-    parser.add_argument('--output_dir', '--output-dir',
+    parser.add_argument('-o', '--output_dir', '--output-dir',
                        type=str,
                        default=None,
                        help='Base directory for resampled output. '

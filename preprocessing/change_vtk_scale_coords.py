@@ -186,12 +186,12 @@ Examples:
   python change_vtk_scale_coords.py --scale_factor 0.1
         """
     )
-    parser.add_argument('--input_dir', '--input-dir',
+    parser.add_argument('-i', '--input_dir', '--input-dir',
                        type=str,
                        default=None,
                        help='Directory containing input surface files (.vtp or .stl). '
                             'Defaults to ./data/surfaces/')
-    parser.add_argument('--output_dir', '--output-dir',
+    parser.add_argument('-o', '--output_dir', '--output-dir',
                        type=str,
                        default=None,
                        help='Directory to write scaled surface files. '

@@ -289,6 +289,7 @@ Examples:
         help="Path to input segmentation mask",
     )
     parser.add_argument(
+        "-o",
         "--output_dir",
         type=str,
         default=None,

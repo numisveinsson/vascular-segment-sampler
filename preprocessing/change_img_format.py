@@ -146,12 +146,12 @@ Examples:
   python change_img_format.py --input_dir /path/to/images --output_format .mha --label_if_string seg
         """
     )
-    parser.add_argument('--input_dir', '--input-dir',
+    parser.add_argument('-i', '--input_dir', '--input-dir',
                        type=str,
                        default=None,
                        help='Directory containing input image files. '
                             'Trailing slash optional. Defaults to ./data/images')
-    parser.add_argument('--output_dir', '--output-dir',
+    parser.add_argument('-o', '--output_dir', '--output-dir',
                        type=str,
                        default=None,
                        help='Directory to write output files. '

@@ -117,12 +117,12 @@ Examples:
   python change_img_scale_coords.py --input_dir /path/to/images --flip --flip_axis True True False --change_lps_to_ras
         """
     )
-    parser.add_argument('--input_dir', '--input-dir',
+    parser.add_argument('-i', '--input_dir', '--input-dir',
                        type=str,
                        default=None,
                        help='Directory containing input images. '
                             'Defaults to ./data/')
-    parser.add_argument('--output_dir', '--output-dir',
+    parser.add_argument('-o', '--output_dir', '--output-dir',
                        type=str,
                        default=None,
                        help='Directory to write output images. '

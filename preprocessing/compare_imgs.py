@@ -153,7 +153,7 @@ Examples:
                        type=str,
                        default=None,
                        help='Path to VTI file to transform')
-    parser.add_argument('--output_file', '--output-file',
+    parser.add_argument('-o', '--output_file', '--output-file',
                        type=str,
                        default=None,
                        help='Output path for transformed VTI file')

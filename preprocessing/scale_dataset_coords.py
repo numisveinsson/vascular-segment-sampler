@@ -156,11 +156,11 @@ Examples:
   python scale_dataset_coords.py --input_dir ./data --scale_factor 0.1 --input_format .nii.gz
         """
     )
-    parser.add_argument('--input_dir', '--input-dir',
+    parser.add_argument('-i', '--input_dir', '--input-dir',
                         type=str,
                         required=True,
                         help='Root directory containing images/, surfaces/, centerlines/, truths/')
-    parser.add_argument('--output_dir', '--output-dir',
+    parser.add_argument('-o', '--output_dir', '--output-dir',
                         type=str,
                         default=None,
                         help='Output root directory. Defaults to input_dir + "_scaled"')
