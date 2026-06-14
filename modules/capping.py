@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import vtk
 from vtk.util.numpy_support import vtk_to_numpy as v2n
@@ -167,8 +168,10 @@ def bryan_generate_oriented_boxes(endpts, unit_tan_vectors, radius,
     box_surfaces.Update()
 
     # Write the oriented box to a .vtp file
+    if outdir:
+        os.makedirs(outdir, exist_ok=True)
     writer = vtk.vtkXMLPolyDataWriter()
-    writer.SetFileName(outdir+output_file+'.vtp')
+    writer.SetFileName(os.path.join(outdir, output_file + '.vtp'))
     writer.SetInputData(box_surfaces.GetOutput())
     writer.Write()
     return box_surfaces.GetOutput(), pd_lst

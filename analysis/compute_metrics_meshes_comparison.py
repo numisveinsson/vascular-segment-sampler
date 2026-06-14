@@ -48,6 +48,7 @@ the implicit distance from points in the GT mesh to the prediction mesh surface 
 	- Dice per radius bucket (Dice along centerline by MaximumInscribedSphereRadius, if --centerline-dir provided)
 	- Normal angular error (degrees): mean, std and max between GT and prediction normals at corresponding surface locations (one-way)
 	- Volume and volume error: enclosed volume (e.g. mm³) per mesh, signed and relative error (requires closed triangulated meshes)
+	- Smoothness (of the prediction/smoothed mesh): area-weighted RMS mean curvature and 95th-percentile adjacent-face dihedral angle
 	
 Note: This is a one-way metric (GT -> prediction only), not symmetric.
 
@@ -184,7 +185,41 @@ def write_vtp(path: str, poly: vtk.vtkPolyData) -> None:
 	writer.Write()
 
 
-def clip_surface_mesh(surface: vtk.vtkPolyData, centerline: vtk.vtkPolyData, case_name: str = None, temp_dir: Optional[str] = None) -> vtk.vtkPolyData:
+def fill_mesh_holes(poly: vtk.vtkPolyData, hole_size: float = 1e30) -> vtk.vtkPolyData:
+	"""Fill holes in a surface mesh so metrics run on a (near-)closed surface.
+
+	Uses ``vtkFillHolesFilter`` (fills any hole whose bounding size is <= ``hole_size``),
+	then recomputes and consistently orients normals because the newly added cap
+	triangles otherwise have undefined orientation, which would corrupt the
+	``vtkMassProperties`` volume/area and the normal-angular-error metric.
+
+	Returns the input mesh unchanged if it has no cells or if filling fails.
+	"""
+	if poly is None or poly.GetNumberOfCells() == 0:
+		return poly
+	try:
+		filler = vtk.vtkFillHolesFilter()
+		filler.SetInputData(poly)
+		filler.SetHoleSize(float(hole_size))
+		filler.Update()
+		filled = filler.GetOutput()
+		if filled is None or filled.GetNumberOfCells() == 0:
+			return poly
+		# Re-orient normals so the newly added cap triangles are consistent with the
+		# rest of the surface (FillHoles leaves them arbitrary).
+		normals = vtk.vtkPolyDataNormals()
+		normals.SetInputData(filled)
+		normals.ConsistencyOn()
+		normals.AutoOrientNormalsOn()
+		normals.SplittingOff()
+		normals.Update()
+		out = normals.GetOutput()
+		return out if (out is not None and out.GetNumberOfCells() > 0) else filled
+	except Exception:
+		return poly
+
+
+def clip_surface_mesh(surface: vtk.vtkPolyData, centerline: vtk.vtkPolyData, case_name: str = None, temp_dir: Optional[str] = None, box_scale: float = 5.0) -> vtk.vtkPolyData:
 	"""Clip a surface mesh using centerline-based clipping boxes.
 	
 	This function applies the same clipping logic as in compute_metrics.py:
@@ -203,7 +238,10 @@ def clip_surface_mesh(surface: vtk.vtkPolyData, centerline: vtk.vtkPolyData, cas
 		Case name for temporary file naming (if temp_dir provided)
 	temp_dir : str, optional
 		Directory for temporary clipping box files (optional)
-	
+	box_scale : float, optional
+		Size of each clipping box as a multiple of the local centerline radius (default: 5.0).
+		Larger values keep more of the surface around each centerline endpoint.
+
 	Returns
 	-------
 	vtk.vtkPolyData
@@ -225,7 +263,7 @@ def clip_surface_mesh(surface: vtk.vtkPolyData, centerline: vtk.vtkPolyData, cas
 	os.makedirs(temp_dir, exist_ok=True)
 	
 	box_name = f"{case_name}_boxclips" if case_name else "boxclips"
-	boxpd, _ = bryan_generate_oriented_boxes(endpts, unit_vecs, radii, box_name, temp_dir, 4)
+	boxpd, _ = bryan_generate_oriented_boxes(endpts, unit_vecs, radii, box_name, temp_dir, box_scale)
 	
 	# Clip the surface
 	clippedpd = bryan_clip_surface(surface, boxpd)
@@ -525,6 +563,24 @@ def mesh_surface_area(poly: vtk.vtkPolyData) -> float:
 		return float('nan')
 
 
+def mesh_max_range(poly: vtk.vtkPolyData) -> float:
+	"""Largest bounding-box axis extent of a mesh, i.e. max(dx, dy, dz).
+
+	Used to detect meshes that have blown up / diverged during smoothing (vertices fly off
+	to huge coordinates). Returns inf if the mesh has no points or the bounds are not finite
+	(treated as diverged), so a threshold check will flag it.
+	"""
+	if poly is None or poly.GetNumberOfPoints() == 0:
+		return float('inf')
+	b = poly.GetBounds()  # (xmin, xmax, ymin, ymax, zmin, zmax)
+	if b is None or len(b) < 6 or not all(math.isfinite(x) for x in b):
+		return float('inf')
+	dx = b[1] - b[0]
+	dy = b[3] - b[2]
+	dz = b[5] - b[4]
+	return float(max(dx, dy, dz))
+
+
 def volume_error_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData) -> dict:
 	"""Volume of each mesh and signed/relative error between them.
 
@@ -564,6 +620,167 @@ def surface_area_error_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyD
 		'surface_area_pred': a_pred,
 		'surface_area_error_abs': err_abs,
 		'surface_area_error_rel': err_rel,
+	}
+
+
+def _triangle_faces(poly: vtk.vtkPolyData) -> np.ndarray:
+	"""(F, 3) int vertex indices for a *triangulated* polydata (empty if none).
+
+	Assumes every polygon is a triangle (run vtkTriangleFilter first); falls back to a
+	safe per-cell parse if the connectivity stream is not uniform 3-vertex cells.
+	"""
+	polys = poly.GetPolys()
+	if polys is None or polys.GetNumberOfCells() == 0:
+		return np.zeros((0, 3), dtype=np.int64)
+	data = np.asarray(numpy_support.vtk_to_numpy(polys.GetData()), dtype=np.int64).ravel()
+	if data.size % 4 == 0:
+		m = data.reshape(-1, 4)
+		if np.all(m[:, 0] == 3):
+			return m[:, 1:4].copy()
+	faces: List[List[int]] = []
+	i = 0
+	n = data.size
+	while i < n:
+		k = int(data[i])
+		if k == 3 and i + 3 < n:
+			faces.append([int(data[i + 1]), int(data[i + 2]), int(data[i + 3])])
+		i += k + 1
+	return np.asarray(faces, dtype=np.int64) if faces else np.zeros((0, 3), dtype=np.int64)
+
+
+def _triangulate(poly: vtk.vtkPolyData) -> vtk.vtkPolyData:
+	tri = vtk.vtkTriangleFilter()
+	tri.SetInputData(poly)
+	tri.Update()
+	return tri.GetOutput()
+
+
+def mean_curvature_rms_area_weighted(poly: vtk.vtkPolyData) -> float:
+	"""Area-weighted RMS of per-vertex mean curvature (units: 1 / mesh length).
+
+	Mean curvature H is computed per vertex with ``vtkCurvatures`` and weighted by the
+	vertex's barycentric area (a third of its incident triangle areas), so dense regions
+	do not dominate::
+
+		rms = sqrt( sum_i w_i * H_i^2 / sum_i w_i )
+
+	Larger values indicate a rougher / more wrinkled surface. Returns nan if the mesh is
+	empty or curvature cannot be computed.
+	"""
+	if poly is None or poly.GetNumberOfCells() == 0:
+		return float('nan')
+	try:
+		surf = _triangulate(poly)
+		if surf.GetNumberOfCells() == 0:
+			return float('nan')
+		cc = vtk.vtkCurvatures()
+		cc.SetInputData(surf)
+		if hasattr(cc, 'SetCurvatureTypeToMean'):
+			cc.SetCurvatureTypeToMean()
+		else:
+			cc.SetCurvatureType(0)
+		cc.Update()
+		out = cc.GetOutput()
+		arr = out.GetPointData().GetArray('Mean_Curvature')
+		if arr is None:
+			return float('nan')
+		H = np.asarray(numpy_support.vtk_to_numpy(arr), dtype=np.float64).ravel()
+		verts = np.asarray(numpy_support.vtk_to_numpy(surf.GetPoints().GetData()), dtype=np.float64)
+		faces = _triangle_faces(surf)
+		if faces.size == 0 or verts.shape[0] != H.shape[0]:
+			return float('nan')
+
+		v0 = verts[faces[:, 0]]
+		v1 = verts[faces[:, 1]]
+		v2 = verts[faces[:, 2]]
+		cp = np.cross(v1 - v0, v2 - v0)
+		tri_area = 0.5 * np.sqrt(np.maximum(np.sum(cp * cp, axis=1), 0.0))
+		good_tri = np.isfinite(tri_area) & (tri_area > 0)
+		if not np.any(good_tri):
+			return float('nan')
+		faces = faces[good_tri]
+		tri_area = tri_area[good_tri]
+
+		w = np.zeros(verts.shape[0], dtype=np.float64)
+		contrib = tri_area / 3.0
+		np.add.at(w, faces[:, 0], contrib)
+		np.add.at(w, faces[:, 1], contrib)
+		np.add.at(w, faces[:, 2], contrib)
+
+		m = np.isfinite(H) & np.isfinite(w) & (w > 0)
+		wsum = float(np.sum(w[m]))
+		if not np.any(m) or wsum <= 0:
+			return float('nan')
+		return float(np.sqrt(np.sum(w[m] * H[m] * H[m]) / wsum))
+	except Exception:
+		return float('nan')
+
+
+def dihedral_angle_percentile_deg(poly: vtk.vtkPolyData, percentile: float = 95.0) -> float:
+	"""High-percentile dihedral angle between adjacent triangle faces (degrees).
+
+	For every interior edge shared by two triangles, the dihedral *deviation* angle is the
+	angle between the two face normals (0 on a flat surface). The given ``percentile`` (95th
+	by default) of those angles summarizes the worst-case local faceting / roughness while
+	ignoring the few most extreme edges. Returns nan if the mesh has no shared edges.
+	"""
+	if poly is None or poly.GetNumberOfCells() == 0:
+		return float('nan')
+	try:
+		surf = _triangulate(poly)
+		verts = np.asarray(numpy_support.vtk_to_numpy(surf.GetPoints().GetData()), dtype=np.float64)
+		faces = _triangle_faces(surf)
+		if faces.size == 0:
+			return float('nan')
+
+		v0 = verts[faces[:, 0]]
+		v1 = verts[faces[:, 1]]
+		v2 = verts[faces[:, 2]]
+		nrm = np.cross(v1 - v0, v2 - v0)
+		nl = np.sqrt(np.sum(nrm * nrm, axis=1))
+		ok = nl > 1e-20
+		unit = np.zeros_like(nrm)
+		unit[ok] = nrm[ok] / nl[ok][:, None]
+
+		n_faces = faces.shape[0]
+		edges = np.concatenate([faces[:, [0, 1]], faces[:, [1, 2]], faces[:, [2, 0]]], axis=0)
+		edges = np.sort(edges, axis=1)
+		face_of_edge = np.tile(np.arange(n_faces, dtype=np.int64), 3)
+
+		order = np.lexsort((edges[:, 1], edges[:, 0]))
+		edges = edges[order]
+		face_of_edge = face_of_edge[order]
+
+		same = np.all(edges[1:] == edges[:-1], axis=1)
+		pos = np.flatnonzero(same)
+		if pos.size == 0:
+			return float('nan')
+		f0 = face_of_edge[pos]
+		f1 = face_of_edge[pos + 1]
+		valid = ok[f0] & ok[f1]
+		f0 = f0[valid]
+		f1 = f1[valid]
+		if f0.size == 0:
+			return float('nan')
+
+		dots = np.clip(np.sum(unit[f0] * unit[f1], axis=1), -1.0, 1.0)
+		ang = np.degrees(np.arccos(dots))
+		if ang.size == 0:
+			return float('nan')
+		return float(np.percentile(ang, float(percentile)))
+	except Exception:
+		return float('nan')
+
+
+def smoothness_metrics(poly: vtk.vtkPolyData) -> dict:
+	"""Intrinsic surface-smoothness metrics for a single mesh (no reference needed).
+
+	Keys: mean_curvature_rms (area-weighted RMS mean curvature, 1/length),
+	dihedral_angle_p95_deg (95th-percentile adjacent-face dihedral angle, degrees).
+	"""
+	return {
+		'mean_curvature_rms': mean_curvature_rms_area_weighted(poly),
+		'dihedral_angle_p95_deg': dihedral_angle_percentile_deg(poly, 95.0),
 	}
 
 
@@ -709,7 +926,7 @@ def voxelize_pair(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData, spacing:
 	return mask_gt, mask_pred, (nx, ny, nz)
 
 
-def compute_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData, max_points: Optional[int] = None, voxel_spacing: Optional[Tuple[float, float, float]] = None, centerline: Optional[vtk.vtkPolyData] = None, metrics_to_compute: Optional[frozenset] = None, min_seg: int = 300) -> dict:
+def compute_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData, max_points: Optional[int] = None, voxel_spacing: Optional[Tuple[float, float, float]] = None, centerline: Optional[vtk.vtkPolyData] = None, metrics_to_compute: Optional[frozenset] = None, min_seg: int = 300, max_mesh_range: Optional[float] = None) -> dict:
 	"""Compute Hausdorff and ASSD between gt and pred polydata (one-way: GT to prediction).
 
 	Computes distances from each point in GT to the nearest point on the prediction surface.
@@ -733,7 +950,11 @@ def compute_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData, max_po
 	min_seg : int
 		Minimum number of centerline segments to target when subsampling for
 		volume_radii and dice_radii metrics.
-	
+	max_mesh_range : float, optional
+		If set, and the prediction mesh's largest bounding-box axis extent exceeds this
+		value (i.e. the mesh diverged during smoothing), all metrics are skipped and the
+		returned dict has status='diverged' with NaN metrics. Disabled when None.
+
 	Returns
 	-------
 	dict
@@ -757,6 +978,8 @@ def compute_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData, max_po
 		  - 'surface_area_error_abs' : signed surface area error (pred - gt)
 		  - 'surface_area_error_rel' : relative surface area error (pred - gt) / gt
 		  - 'surface_dice_t1', 'surface_dice_t2' : surface Dice at two fixed tolerances (same units as mesh coordinates)
+		  - 'mean_curvature_rms' : area-weighted RMS mean curvature of the prediction (smoothed) mesh (1/length)
+		  - 'dihedral_angle_p95_deg' : 95th-percentile adjacent-face dihedral angle of the prediction (smoothed) mesh (degrees)
 	
 	Note
 	----
@@ -774,6 +997,16 @@ def compute_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData, max_po
 	do_volume = compute_all or ('volume' in metrics_to_compute)
 	do_surface_area = compute_all or ('surface_area' in metrics_to_compute)
 	do_surface_dice = compute_all or ('surface_dice' in metrics_to_compute)
+	do_smoothness = compute_all or ('smoothness' in metrics_to_compute)
+
+	# Detect a prediction mesh that diverged during smoothing: if its bounding-box range
+	# exceeds the threshold (or is non-finite), skip all metrics and report it as failed.
+	pred_range = mesh_max_range(pred_poly)
+	if max_mesh_range is not None and (not math.isfinite(pred_range) or pred_range > max_mesh_range):
+		diverged = {k: float('nan') for k in RESULTS_FIELDNAMES if k not in ('case', 'status', 'mesh_range')}
+		diverged['status'] = 'diverged'
+		diverged['mesh_range'] = pred_range
+		return diverged
 
 	# Only compute distances from GT points to prediction surface (for distance metrics)
 	if do_distance:
@@ -801,6 +1034,8 @@ def compute_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData, max_po
 	assd = mean_gt_to_pred
 
 	result = {
+		'status': 'ok',
+		'mesh_range': pred_range,
 		'hausdorff_sym': haus_sym,
 		'hausdorff_gt_to_pred': haus_gt_to_pred,
 		'hausdorff_pred_to_gt': float('nan'),  # Not computed (one-way only)
@@ -831,6 +1066,8 @@ def compute_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData, max_po
 		'surface_area_error_rel': float('nan'),
 		'surface_dice_t1': float('nan'),
 		'surface_dice_t2': float('nan'),
+		'mean_curvature_rms': float('nan'),
+		'dihedral_angle_p95_deg': float('nan'),
 	}
 
 	# Compute Dice coefficient using full occupancy maps (no sampling): voxelize both meshes
@@ -930,6 +1167,16 @@ def compute_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData, max_po
 		except Exception:
 			pass
 
+	# Intrinsic smoothness of the prediction (smoothed) mesh: area-weighted RMS mean
+	# curvature and 95th-percentile adjacent-face dihedral angle. No reference needed.
+	if do_smoothness:
+		try:
+			sm = smoothness_metrics(pred_poly)
+			result['mean_curvature_rms'] = sm['mean_curvature_rms']
+			result['dihedral_angle_p95_deg'] = sm['dihedral_angle_p95_deg']
+		except Exception:
+			pass
+
 	return result
 
 
@@ -1007,12 +1254,15 @@ METRIC_NAMES = frozenset({
 	'volume',         # Volume and volume error
 	'surface_area',   # Surface area and surface area error
 	'surface_dice',   # Surface Dice at two tolerances
+	'smoothness',     # Area-weighted RMS mean curvature and 95th-pct dihedral angle of pred mesh
 })
 
 
 # Metric column names (excluding 'case') for CSV and summary
 RESULTS_FIELDNAMES = [
 	'case',
+	'status',
+	'mesh_range',
 	'hausdorff_sym',
 	'hd95_sym',
 	'hausdorff_gt_to_pred',
@@ -1042,6 +1292,8 @@ RESULTS_FIELDNAMES = [
 	'surface_area_error_rel',
 	'surface_dice_t1',
 	'surface_dice_t2',
+	'mean_curvature_rms',
+	'dihedral_angle_p95_deg',
 ]
 
 
@@ -1123,7 +1375,7 @@ def write_dice_radii_raw_csv(out_path: str, rows: List[dict]) -> None:
 
 def write_summary_csv(summary_csv: str, summary_rows: List[dict]) -> None:
 	"""Write summary CSV: one row per prediction folder with mean and std for each metric."""
-	metric_keys = [k for k in RESULTS_FIELDNAMES if k != 'case']
+	metric_keys = [k for k in RESULTS_FIELDNAMES if k not in ('case', 'status', 'mesh_range')]
 	fieldnames = ['pred_folder'] + [f'{k}_mean' for k in metric_keys] + [f'{k}_std' for k in metric_keys]
 	with open(summary_csv, 'w', newline='') as f:
 		w = csv.DictWriter(f, fieldnames=fieldnames)
@@ -1156,6 +1408,10 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 	p.add_argument('--metrics', type=parse_metrics_arg, default=None, metavar='M1,M2,...', help=f'Comma-separated metrics to compute. Default: all. Valid: {", ".join(sorted(METRIC_NAMES))}')
 	p.add_argument('--max-points', type=int, default=None, help='If set, randomly sample at most this many points from each mesh')
 	p.add_argument('--min-seg', type=int, default=30, help='Minimum number of centerline segments to target when subsampling for volume_radii and dice_radii (default: 300)')
+	p.add_argument('--max-mesh-range', type=float, default=None, help='If set, prediction meshes whose largest bounding-box axis extent (mesh units, e.g. mm) exceeds this are treated as diverged: metrics are skipped and the case is reported with status=diverged. Disabled by default.')
+	p.add_argument('--fill-holes', dest='fill_holes', action='store_true', default=True, help='Fill holes in gt and pred meshes (after any clipping) before computing metrics (default: on).')
+	p.add_argument('--no-fill-holes', dest='fill_holes', action='store_false', help='Disable hole filling before computing metrics.')
+	p.add_argument('--fill-holes-size', type=float, default=1e30, help='Maximum hole size to fill (vtkFillHolesFilter HoleSize, mesh units). Default: 1e30 (fill all holes).')
 	p.add_argument('--ext', default='.vtp', help='File extension to look for (default: .vtp)')
 	p.add_argument('--spacing', default='1.0', help='Voxel spacing for Dice voxelization (full occupancy, no sampling). Single float or comma-separated three floats (e.g. "1.0" or "0.5,0.5,1.0"). Default: 1.0 (isotropic).')
 	p.add_argument('--centerline-dir', default=None, help='Directory containing centerline .vtp files. Required if --clip is used. If provided, centerline overlap metric will be computed.')
@@ -1180,6 +1436,9 @@ def run_metrics_for_pred_dir(
 	quiet: bool,
 	cases_filter: Optional[set] = None,
 	metrics_to_compute: Optional[frozenset] = None,
+	max_mesh_range: Optional[float] = None,
+	fill_holes: bool = True,
+	fill_holes_size: float = 1e30,
 ) -> List[dict]:
 	"""Run metrics for all matching cases between gt_dir and pred_dir. Returns list of per-case rows.
 
@@ -1210,10 +1469,17 @@ def run_metrics_for_pred_dir(
 					centerline = (vf.read_geo(os.path.join(centerline_dir, case + ext)).GetOutput() if vf is not None else load_vtp(os.path.join(centerline_dir, case + ext)))
 				except Exception:
 					pass
-			metrics = compute_metrics(gt_poly, pred_poly, max_points=max_points, voxel_spacing=voxel_spacing, centerline=centerline, metrics_to_compute=metrics_to_compute, min_seg=min_seg)
+			# Fill holes so volume/area/Dice run on (near-)closed surfaces. Done after any
+			# clipping so the cut ends are also closed.
+			if fill_holes:
+				gt_poly = fill_mesh_holes(gt_poly, hole_size=fill_holes_size)
+				pred_poly = fill_mesh_holes(pred_poly, hole_size=fill_holes_size)
+			metrics = compute_metrics(gt_poly, pred_poly, max_points=max_points, voxel_spacing=voxel_spacing, centerline=centerline, metrics_to_compute=metrics_to_compute, min_seg=min_seg, max_mesh_range=max_mesh_range)
 			row = {'case': case}
 			row.update(metrics)
 			rows.append(row)
+			if metrics.get('status') == 'diverged' and not quiet:
+				print(f'  FAIL: {case} diverged (mesh range {metrics.get("mesh_range")!r} > {max_mesh_range}); metrics skipped', file=sys.stderr)
 		except Exception as e:
 			if not quiet:
 				print(f'  Error processing {case}: {e}', file=sys.stderr)
@@ -1245,6 +1511,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 	out_csv = args.out_csv
 	max_points = args.max_points
 	min_seg = max(1, int(args.min_seg))
+	max_mesh_range = getattr(args, 'max_mesh_range', None)
+	fill_holes = getattr(args, 'fill_holes', True)
+	fill_holes_size = getattr(args, 'fill_holes_size', 1e30)
 	ext = args.ext if args.ext.startswith('.') else '.' + args.ext
 	clip = args.clip
 	centerline_dir = args.centerline_dir
@@ -1327,7 +1596,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 		if not args.quiet:
 			print(f'Processing {len(common_cases)} cases present in gt_dir and all {len(subdirs)} prediction folders')
 			_print_missing_cases(gt_dir, pred_dirs, subdirs, common_cases, ext)
-		metric_keys = [k for k in RESULTS_FIELDNAMES if k != 'case']
+		metric_keys = [k for k in RESULTS_FIELDNAMES if k not in ('case', 'status', 'mesh_range')]
 		summary_rows = []
 		for pred_folder in subdirs:
 			pred_path = os.path.join(predictions_root, pred_folder)
@@ -1338,6 +1607,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 				clip, centerline_dir, clip_temp_dir, clip_output_dir, args.quiet,
 				cases_filter=common_cases,
 				metrics_to_compute=metrics_to_compute,
+				max_mesh_range=max_mesh_range,
+				fill_holes=fill_holes,
+				fill_holes_size=fill_holes_size,
 			)
 			if not rows:
 				if not args.quiet:
@@ -1448,11 +1720,20 @@ def main(argv: Optional[List[str]] = None) -> int:
 					if not args.quiet:
 						print(f'  Warning: Centerline not found: {centerline_path}', file=sys.stderr)
 			
+			# Fill holes so volume/area/Dice run on (near-)closed surfaces. Done after any
+			# clipping so the cut ends are also closed.
+			if fill_holes:
+				gt_poly = fill_mesh_holes(gt_poly, hole_size=fill_holes_size)
+				pred_poly = fill_mesh_holes(pred_poly, hole_size=fill_holes_size)
+
 			spacing = parse_spacing_arg(args.spacing) if getattr(args, 'spacing', None) is not None else None
-			metrics = compute_metrics(gt_poly, pred_poly, max_points=max_points, voxel_spacing=spacing, centerline=centerline, metrics_to_compute=metrics_to_compute, min_seg=min_seg)
+			metrics = compute_metrics(gt_poly, pred_poly, max_points=max_points, voxel_spacing=spacing, centerline=centerline, metrics_to_compute=metrics_to_compute, min_seg=min_seg, max_mesh_range=max_mesh_range)
 			row = {'case': case}
 			row.update(metrics)
 			rows.append(row)
+			if metrics.get('status') == 'diverged':
+				print(f'FAIL: {case} diverged (mesh range {metrics.get("mesh_range")!r} > {max_mesh_range}); metrics skipped', file=sys.stderr)
+				continue
 			if not args.quiet:
 				msg = f"  Hausdorff (GT->pred): {metrics['hausdorff_gt_to_pred']:.6g}, HD95 (GT->pred): {metrics['hd95_gt_to_pred']:.6g}, ASSD: {metrics['assd']:.6g}"
 				if not math.isnan(metrics.get('dice', math.nan)):

@@ -104,6 +104,90 @@ def add_wilcoxon_bracket(
     ax.set_ylim(ymin, y_bracket + 0.14 * y_span)
 
 
+def _compute_pvalue(
+    vals1: np.ndarray,
+    vals2: np.ndarray,
+    patients1: np.ndarray | None = None,
+    patients2: np.ndarray | None = None,
+) -> float | None:
+    """Two-sided p-value for two groups.
+
+    Paired Wilcoxon signed-rank (matched by case) when both patient arrays are given,
+    otherwise unpaired Mann-Whitney U. Returns None if a test can't be computed.
+    """
+    if patients1 is not None and patients2 is not None:
+        common = np.intersect1d(patients1, patients2)
+        if len(common) < 2:
+            return None
+        paired1 = np.array([vals1[np.where(patients1 == p)[0][0]] for p in common])
+        paired2 = np.array([vals2[np.where(patients2 == p)[0][0]] for p in common])
+        try:
+            _, p = wilcoxon(paired1, paired2, alternative='two-sided')
+        except Exception:
+            return None
+        return p
+    if len(vals1) < 2 or len(vals2) < 2:
+        return None
+    try:
+        _, p = mannwhitneyu(vals1, vals2, alternative='two-sided')
+    except Exception:
+        return None
+    return p
+
+
+def add_pairwise_brackets(
+    ax,
+    vals_by_group: list[np.ndarray],
+    positions: list[float],
+    patients_by_group: list[np.ndarray] | None = None,
+) -> None:
+    """Draw stacked significance brackets for every pair of groups.
+
+    Uses a paired Wilcoxon signed-rank test (matched by case) when patients_by_group
+    is provided, otherwise an unpaired Mann-Whitney U test. Brackets are stacked
+    vertically with shortest-span pairs lowest so they don't overlap. Works for any
+    number of groups >= 2 (e.g. the 3-method case).
+    """
+    n = len(vals_by_group)
+    if n < 2:
+        return
+    pairs: list[tuple[float, float, float, float]] = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            p1 = None if patients_by_group is None else patients_by_group[i]
+            p2 = None if patients_by_group is None else patients_by_group[j]
+            p = _compute_pvalue(vals_by_group[i], vals_by_group[j], p1, p2)
+            if p is None:
+                continue
+            span = abs(positions[j] - positions[i])
+            pairs.append((span, positions[i], positions[j], p))
+    if not pairs:
+        return
+    # Shortest-span (adjacent) pairs drawn lowest, wider spans stacked above.
+    pairs.sort(key=lambda t: t[0])
+    ymin, ymax = ax.get_ylim()
+    y_span = ymax - ymin
+    level_step = 0.10 * y_span
+    y0 = ymax + 0.04 * y_span
+    for level, (_, pos1, pos2, p) in enumerate(pairs):
+        y_bracket = y0 + level * level_step
+        ax.plot(
+            [pos1, pos1, pos2, pos2],
+            [y_bracket, y_bracket + 0.02 * y_span, y_bracket + 0.02 * y_span, y_bracket],
+            color='black',
+            linewidth=0.5,
+        )
+        ax.text(
+            (pos1 + pos2) / 2,
+            y_bracket + 0.025 * y_span,
+            format_pvalue(p),
+            ha='center',
+            va='bottom',
+            fontsize=5,
+        )
+    ax.set_ylim(ymin, y0 + (len(pairs) - 1) * level_step + 0.12 * y_span)
+
+
 def add_wilcoxon_signed_rank_bracket(
     ax,
     vals1: np.ndarray,
@@ -158,6 +242,7 @@ def draw_violin_ax(
     group_order: list[str] | None = None,
     set_ylim: Callable[["Axes"], None] | None = None,
     add_wilcoxon: bool = True,
+    patients_by_group: list[np.ndarray] | None = None,
     subplot_label: str | None = None,
     xtick_rotation: float = 15,
 ) -> None:
@@ -174,7 +259,12 @@ def draw_violin_ax(
         group_order: If colors is a dict, order of group names for lookup.
             Default: use positions index to index into group_order.
         set_ylim: Optional callable(ax) to set y-axis limits.
-        add_wilcoxon: If True and exactly 2 groups, add Mann-Whitney U bracket.
+        add_wilcoxon: If True and 2+ groups, add stacked pairwise significance
+            brackets (one per pair of groups).
+        patients_by_group: Optional list of case/patient label arrays (one per group,
+            aligned with vals_by_group). When provided, a paired Wilcoxon signed-rank
+            test (matched by case) is used per pair instead of the unpaired
+            Mann-Whitney U test.
         subplot_label: Optional label (e.g. 'a', 'b') in top-left.
         xtick_rotation: Rotation of x-tick labels in degrees.
     """
@@ -220,8 +310,11 @@ def draw_violin_ax(
     ax.set_ylabel(ylabel)
     if set_ylim:
         set_ylim(ax)
-    if add_wilcoxon and len(vals_by_group) == 2:
-        add_wilcoxon_bracket(ax, vals_by_group[0], vals_by_group[1], positions[0], positions[1])
+    if add_wilcoxon and len(vals_by_group) >= 2:
+        patients = patients_by_group if (
+            patients_by_group is not None and len(patients_by_group) == len(vals_by_group)
+        ) else None
+        add_pairwise_brackets(ax, vals_by_group, positions, patients)
     ax.grid(axis='y', alpha=0.25, linewidth=0.25)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)

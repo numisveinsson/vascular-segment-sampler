@@ -109,6 +109,15 @@ Examples:
                        action='store_true',
                        default=False,
                        help='Apply smoothing to surfaces')
+    parser.add_argument('--smooth_method', '--smooth-method',
+                       type=str,
+                       default='cotangent_taubin',
+                       choices=['cotangent_taubin', 'vtk_taubin', 'vtk_laplacian'],
+                       help='Which smoothing method to apply when --smooth is set '
+                            '(default: cotangent_taubin). '
+                            'cotangent_taubin: numpy cotangent-Laplacian Taubin smoothing; '
+                            'vtk_taubin: VTK windowed-sinc (Taubin pass-band) smoothing; '
+                            'vtk_laplacian: VTK Laplacian smoothing.')
     parser.add_argument('--keep_largest', '--keep-largest',
                        type=int,
                        nargs='?',
@@ -134,6 +143,7 @@ Examples:
     args = parser.parse_args()
     
     if_smooth = args.smooth
+    smooth_method = args.smooth_method
     keep_largest_n = args.keep_largest
 
     if_spacing_file = args.spacing_file is not None
@@ -237,8 +247,14 @@ Examples:
             poly = vf.get_k_largest_connected_polydata(poly, keep_largest_n)
 
         if if_smooth:
-            # smooth the surface
-            poly = vf.smooth_polydata(poly, iteration=50)
+            # smooth the surface using the selected method
+            if smooth_method == 'cotangent_taubin':
+                poly = vf.taubin_smooth_polydata(poly, it=400, mu1=0.5, mu2=0.51)
+            elif smooth_method == 'vtk_taubin':
+                poly = vf.smooth_polydata(poly, iteration=25, smoothingFactor=0.)
+            elif smooth_method == 'vtk_laplacian':
+                poly = vf.laplacian_smooth_polydata(poly, iteration=25, relaxation=0.1)
+            logger.debug(f"Smoothed surface using method: {smooth_method}")
         # Write surfaces
         vf.write_geo(os.path.join(out_dir, img.replace(img_ext, '.vtp')), poly)
         logger.info(f"Finished case: {img}")

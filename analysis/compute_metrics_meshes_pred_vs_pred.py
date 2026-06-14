@@ -87,7 +87,7 @@ else:
 
 def write_summary_csv(summary_csv: str, summary_rows: List[dict]) -> None:
 	"""Write summary CSV: one row per comparison pair with mean and std for each metric."""
-	metric_keys = [k for k in RESULTS_FIELDNAMES if k != 'case']
+	metric_keys = [k for k in RESULTS_FIELDNAMES if k not in ('case', 'status', 'mesh_range')]
 	fieldnames = ['comparison'] + [f'{k}_mean' for k in metric_keys] + [f'{k}_std' for k in metric_keys]
 	with open(summary_csv, 'w', newline='') as f:
 		w = csv.DictWriter(f, fieldnames=fieldnames)
@@ -265,7 +265,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 			print(f'Error: Centerline directory does not exist: {centerline_dir}', file=sys.stderr)
 			return 1
 
-	metric_keys = [k for k in RESULTS_FIELDNAMES if k != 'case']
+	metric_keys = [k for k in RESULTS_FIELDNAMES if k not in ('case', 'status', 'mesh_range')]
 	summary_rows = []
 	pairs_processed = 0
 

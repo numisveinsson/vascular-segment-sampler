@@ -14,7 +14,10 @@
     {"iterations": 25, "boundary": false, "feature": false, "smoothing_factor": 0.5},
     {"iterations": 50, "boundary": false, "feature": false, "smoothing_factor": 0.1},
     {"iterations": 50, "boundary": false, "feature": false, "smoothing_factor": 0.25},
-    {"iterations": 50, "boundary": false, "feature": false, "smoothing_factor": 0.5}
+    {"iterations": 50, "boundary": false, "feature": false, "smoothing_factor": 0.5},
+    {"iterations": 100, "boundary": false, "feature": false, "smoothing_factor": 0.1},
+    {"iterations": 100, "boundary": false, "feature": false, "smoothing_factor": 0.25},
+    {"iterations": 100, "boundary": false, "feature": false, "smoothing_factor": 0.5}
   ],
   "taubin_cot": [
     {"iterations": 30, "mu1": 0.3, "mu2": 0.31},
@@ -29,11 +32,23 @@
     {"iterations": 100, "mu1": 0.3, "mu2": 0.31},
     {"iterations": 100, "mu1": 0.5, "mu2": 0.51},
     {"iterations": 100, "mu1": 0.7, "mu2": 0.71},
-    {"iterations": 150, "mu1": 0.3, "mu2": 0.31},
-    {"iterations": 150, "mu1": 0.5, "mu2": 0.51},
-    {"iterations": 150, "mu1": 0.7, "mu2": 0.71},
     {"iterations": 200, "mu1": 0.3, "mu2": 0.31},
     {"iterations": 200, "mu1": 0.5, "mu2": 0.51},
-    {"iterations": 200, "mu1": 0.7, "mu2": 0.71}
+    {"iterations": 200, "mu1": 0.7, "mu2": 0.71},
+    {"iterations": 300, "mu1": 0.3, "mu2": 0.31},
+    {"iterations": 300, "mu1": 0.5, "mu2": 0.51},
+    {"iterations": 300, "mu1": 0.7, "mu2": 0.71},
+    {"iterations": 400, "mu1": 0.3, "mu2": 0.31},
+    {"iterations": 400, "mu1": 0.5, "mu2": 0.51},
+    {"iterations": 400, "mu1": 0.7, "mu2": 0.71},
+    {"iterations": 600, "mu1": 0.3, "mu2": 0.31},
+    {"iterations": 600, "mu1": 0.5, "mu2": 0.51},
+    {"iterations": 600, "mu1": 0.7, "mu2": 0.71},
+    {"iterations": 800, "mu1": 0.3, "mu2": 0.31},
+    {"iterations": 800, "mu1": 0.5, "mu2": 0.51},
+    {"iterations": 800, "mu1": 0.7, "mu2": 0.71},
+    {"iterations": 1000, "mu1": 0.3, "mu2": 0.31},
+    {"iterations": 1000, "mu1": 0.5, "mu2": 0.51},
+    {"iterations": 1000, "mu1": 0.7, "mu2": 0.71}
   ]
 }

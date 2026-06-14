@@ -3,7 +3,7 @@
 DATASET_NAME: 'vmr' #'vmr' # or other 'other'
 
 IMG_EXT: '.mha'
-
+MODALITY: ['CT'] # 'CT' or 'MR'
 # BINARIZE: Convert segmentation masks to binary (0=background, 1=vessel) 
 # If False, preserves original multi-label segmentations
 BINARIZE: True

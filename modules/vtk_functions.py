@@ -1172,6 +1172,32 @@ def smooth_polydata(poly, iteration=25, boundary=False, feature=False, smoothing
     return smoothed
 
 
+def laplacian_smooth_polydata(poly, iteration=25, relaxation=0.1, boundary=False, feature=False):
+    """
+    Apply VTK Laplacian smoothing to a vtk polydata using vtkSmoothPolyDataFilter.
+
+    Args:
+        poly: vtk polydata to smooth
+        iteration: number of smoothing iterations
+        relaxation: relaxation factor (step size per iteration)
+        boundary: boundary smooth bool
+        feature: feature edge smoothing bool
+    Returns:
+        smoothed: smoothed vtk polydata
+    """
+    smoother = vtk.vtkSmoothPolyDataFilter()
+    smoother.SetInputData(poly)
+    smoother.SetNumberOfIterations(iteration)
+    smoother.SetRelaxationFactor(relaxation)
+    smoother.SetBoundarySmoothing(boundary)
+    smoother.SetFeatureEdgeSmoothing(feature)
+    smoother.Update()
+
+    smoothed = smoother.GetOutput()
+
+    return smoothed
+
+
 def decimation(poly, rate):
     """
     Simplifies a VTK PolyData

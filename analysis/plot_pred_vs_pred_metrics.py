@@ -46,6 +46,8 @@ DEFAULT_METRICS = [
 	'surface_dice_t1',
 	'surface_dice_t2',
 	'centerline_overlap',
+	'mean_curvature_rms',
+	'dihedral_angle_p95_deg',
 ]
 
 # Display names for LaTeX table row labels
@@ -62,6 +64,8 @@ METRIC_DISPLAY_NAMES = {
 	'mean_normal_angular_error_gt_to_pred': 'Average Normal Difference (°)',
 	'max_normal_angular_error_gt_to_pred': 'Max Normal Difference (°)',
 	'std_normal_angular_error_gt_to_pred': 'Std Normal Difference (°)',
+	'mean_curvature_rms': 'Mean curvature RMS (1/mm)',
+	'dihedral_angle_p95_deg': 'Dihedral angle p95 (°)',
 }
 
 # Abbreviations for LaTeX table column headers (short form for compact tables)
@@ -78,6 +82,8 @@ METRIC_ABBREVIATIONS = {
 	'mean_normal_angular_error_gt_to_pred': 'AvgNorm',
 	'max_normal_angular_error_gt_to_pred': 'MaxNorm',
 	'std_normal_angular_error_gt_to_pred': 'StdNorm',
+	'mean_curvature_rms': 'CurvRMS',
+	'dihedral_angle_p95_deg': 'Dih95',
 }
 
 # Dice-like metrics: [0, 1] range, ylim upper = 1
@@ -86,6 +92,7 @@ DICE_METRICS = {'dice', 'surface_dice_t1', 'surface_dice_t2', 'centerline_overla
 DISTANCE_METRICS = {
 	'hausdorff_sym', 'hd95_sym', 'assd', 'volume_error_rel', 'surface_area_error_rel',
 	'mean_normal_angular_error_gt_to_pred', 'max_normal_angular_error_gt_to_pred', 'std_normal_angular_error_gt_to_pred',
+	'mean_curvature_rms', 'dihedral_angle_p95_deg',
 }
 # Relative error metrics: use absolute value before plotting and calculations
 RELATIVE_ERROR_METRICS = {'volume_error_rel', 'surface_area_error_rel'}

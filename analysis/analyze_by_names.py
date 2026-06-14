@@ -45,6 +45,7 @@ METRIC_COLUMNS = [
 ] + _VOLUME_RADII_FIELDNAMES + [
 	'surface_area_gt', 'surface_area_pred', 'surface_area_error_abs', 'surface_area_error_rel',
 	'surface_dice_t1', 'surface_dice_t2',
+	'mean_curvature_rms', 'dihedral_angle_p95_deg',
 ]
 
 # Compact display names and direction (↓ lower better, ↑ higher better) for LaTeX
@@ -77,6 +78,8 @@ METRIC_DISPLAY: Dict[str, Tuple[str, str]] = {
 	'surface_area_error_rel': ('Surf. err. rel', '$\\downarrow$'),
 	'surface_dice_t1': ('SurfDice $t_1$', '$\\uparrow$'),
 	'surface_dice_t2': ('SurfDice $t_2$', '$\\uparrow$'),
+	'mean_curvature_rms': ('Curv. RMS', '$\\downarrow$'),
+	'dihedral_angle_p95_deg': ('Dihedral p95', '$\\downarrow$'),
 }
 
 
@@ -197,6 +200,10 @@ def analyze_csv_by_categories(
 	rows = load_csv_rows(csv_path)
 	by_cat: Dict[str, List[dict]] = {}
 	for r in rows:
+		# Diverged cases (failed during smoothing) are excluded from metric aggregation;
+		# their counts are reported separately via count_cases_by_category.
+		if str(r.get('status', '')).strip().lower() == 'diverged':
+			continue
 		case = r.get('case', '')
 		cat = case_to_cat.get(case)
 		if cat is None:
@@ -220,12 +227,33 @@ def analyze_csv_by_categories(
 	return result
 
 
+def count_cases_by_category(
+	csv_path: str,
+	case_to_cat: Dict[str, str],
+) -> Dict[str, Dict[str, int]]:
+	"""Per category: {'n_cases': total cases, 'n_diverged': cases with status=='diverged'}.
+
+	A case is counted as diverged when its 'status' column equals 'diverged' (case-insensitive).
+	"""
+	rows = load_csv_rows(csv_path)
+	counts: Dict[str, Dict[str, int]] = {}
+	for r in rows:
+		case = r.get('case', '')
+		cat = case_to_cat.get(case, '_uncategorized')
+		d = counts.setdefault(cat, {'n_cases': 0, 'n_diverged': 0})
+		d['n_cases'] += 1
+		if str(r.get('status', '')).strip().lower() == 'diverged':
+			d['n_diverged'] += 1
+	return counts
+
+
 def write_category_summary(
 	out_path: str,
 	summary: Dict[str, Dict[str, Dict[str, float]]],
 	metrics_filter: Optional[List[str]] = None,
+	counts: Optional[Dict[str, Dict[str, int]]] = None,
 ) -> None:
-	"""Write per-category mean/std to CSV."""
+	"""Write per-category mean/std to CSV (with optional n_cases / n_diverged columns)."""
 	cats = sorted(summary.keys())
 	if not cats:
 		return
@@ -245,13 +273,18 @@ def write_category_summary(
 					seen.add(m)
 					allowed.append(m)
 	metrics = [k for k in allowed if any(summary[c].get(k) for c in cats)]
-	fieldnames = ['category'] + [f'{m}_mean' for m in metrics] + [f'{m}_std' for m in metrics]
+	count_fields = ['n_cases', 'n_diverged'] if counts is not None else []
+	fieldnames = ['category'] + count_fields + [f'{m}_mean' for m in metrics] + [f'{m}_std' for m in metrics]
 
 	with open(out_path, 'w', newline='') as f:
 		w = csv.DictWriter(f, fieldnames=fieldnames)
 		w.writeheader()
 		for cat in cats:
 			row = {'category': cat}
+			if counts is not None:
+				c = counts.get(cat, {'n_cases': 0, 'n_diverged': 0})
+				row['n_cases'] = c.get('n_cases', 0)
+				row['n_diverged'] = c.get('n_diverged', 0)
 			for m in metrics:
 				d = summary[cat].get(m, {'mean': float('nan'), 'std': float('nan')})
 				row[f'{m}_mean'] = d['mean'] if not math.isnan(d['mean']) else ''
@@ -534,7 +567,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 		out_path = os.path.join(out_dir, out_name)
 
 		summary = analyze_csv_by_categories(csv_path, case_to_cat, columns=metrics_filter)
-		write_category_summary(out_path, summary, metrics_filter)
+		counts = count_cases_by_category(csv_path, case_to_cat)
+		write_category_summary(out_path, summary, metrics_filter, counts=counts)
 		all_summaries[stem] = summary
 		if not args.quiet:
 			print(f'Wrote {out_path}')
