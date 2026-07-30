@@ -13,11 +13,17 @@ plot_dice_per_radii.py instead, which read summary.csv.
 Usage:
 	python -m analysis.plot_mesh_metrics /path/to/output_dir
 	python -m analysis.plot_mesh_metrics /path/to/output_dir --out-dir /path/to/figures
-	python -m analysis.plot_mesh_metrics /path/to/output_dir --metrics mean_curvature_rms,dihedral_angle_p95_deg
 	python -m analysis.plot_mesh_metrics /path/to/output_dir --separate --format pdf
+	python -m analysis.plot_mesh_metrics /path/to/output_dir --metrics dice,hausdorff_sym
+
+By default, all numeric CSV columns are plotted (except per-radius buckets and metadata),
+skipping any column that is entirely NaN. Use --metrics to restrict to a subset.
 
 	# per anatomy: group violins by category (x-axis), methods shown as colors
 	python -m analysis.plot_mesh_metrics /path/to/output_dir --categories analysis/categories.json
+
+	# exclude specific cases from all plots (and failure denominators)
+	python -m analysis.plot_mesh_metrics /path/to/output_dir --skip-cases case_a,case_b
 
 Rows with status='diverged' (meshes that blew up during smoothing) carry NaN metrics and are
 automatically dropped from the plots.
@@ -42,7 +48,6 @@ if _repo_root not in sys.path:
 # Reuse the shared metric metadata and y-limit helpers so labels/axes stay consistent
 # with the pred-vs-pred plots (and so newly added metrics like smoothness are picked up).
 from analysis.plot_pred_vs_pred_metrics import (  # noqa: E402
-	DEFAULT_METRICS,
 	RELATIVE_ERROR_METRICS,
 	_get_numeric_metric_columns,
 	_metric_label,
@@ -54,6 +59,48 @@ from analysis.plotting.violin_plot_functions import (  # noqa: E402
 	get_nature_colors,
 	save_violin_figure,
 )
+
+# Bounded overlap metrics: fixed y-axis with metric-specific lower bound, top at 1.
+YAXIS_YMIN_BY_METRIC = {
+	'dice': 0.8,
+	'centerline_overlap': 0.7,
+}
+
+X_TICK_LABELSIZE = 5
+
+# Non-metric columns to never plot (radii bucket columns are excluded in _get_numeric_metric_columns).
+_PLOT_EXCLUDE_COLUMNS = frozenset({
+	'status', 'mesh_range', 'pred_folder', 'category',
+	'n_sampled_gt', 'n_sampled_pred', 'n_voxels_gt', 'n_voxels_pred',
+})
+
+
+def _set_mesh_metric_ylim(ax, metric: str) -> None:
+	"""Set y-axis limits; dice and centerline overlap use fixed [ymin, 1]."""
+	ymin = YAXIS_YMIN_BY_METRIC.get(metric)
+	if ymin is not None:
+		ax.set_ylim(ymin, 1)
+	else:
+		_set_ylim(ax, metric)
+
+
+def _values_for_plot(values: np.ndarray, metric: str) -> np.ndarray:
+	"""Return metric values clipped to [0, 1] for bounded overlap metrics."""
+	if metric in YAXIS_YMIN_BY_METRIC:
+		return np.clip(values, 0, 1)
+	return values
+
+
+def _get_plot_metric_columns(df: pd.DataFrame, metrics: list[str] | None) -> list[str]:
+	"""Return numeric metric columns to plot.
+
+	By default (``metrics is None``), all numeric CSV columns are candidates except
+	per-radius buckets and metadata. Only columns with at least one non-NaN value
+	are included.
+	"""
+	cols = _get_numeric_metric_columns(df, metrics)
+	cols = [c for c in cols if c not in _PLOT_EXCLUDE_COLUMNS]
+	return sorted(c for c in cols if df[c].notna().any())
 
 
 def _find_per_folder_csvs(indir: str, stem: str) -> list[tuple[str, str]]:
@@ -108,6 +155,23 @@ def _load_all_folders(indir: str, stem: str) -> pd.DataFrame | None:
 
 def _format_folder_label(name: str) -> str:
 	return name.replace('_', ' ')
+
+
+def _parse_skip_cases(skip_cases: str | None) -> set[str]:
+	"""Parse comma-separated case names to exclude from plotting."""
+	if not skip_cases:
+		return set()
+	return {c.strip() for c in skip_cases.split(',') if c.strip()}
+
+
+def _filter_skip_cases(df: pd.DataFrame, skip_cases: set[str]) -> pd.DataFrame:
+	"""Drop rows whose case name is in skip_cases."""
+	if not skip_cases:
+		return df
+	if 'case' not in df.columns:
+		print('Warning: --skip-cases ignored (no case column in input CSVs)', file=sys.stderr)
+		return df
+	return df[~df['case'].astype(str).isin(skip_cases)]
 
 
 def _diverged_counts(df: pd.DataFrame, group_col: str) -> dict[str, tuple[int, int]]:
@@ -232,7 +296,7 @@ def _draw_failure_panel(
 		offset = (mi - (n_m - 1) / 2.0) * width
 		ax.bar(x + offset, heights, width * 0.9, color=method_colors.get(method, '#666666'), label=_format_folder_label(method))
 	ax.set_xticks(range(len(categories)))
-	ax.set_xticklabels([_format_folder_label(c) for c in categories], rotation=rotation, ha='right')
+	ax.set_xticklabels([_format_folder_label(c) for c in categories], rotation=rotation, ha='right', fontsize=X_TICK_LABELSIZE)
 	ax.set_ylabel('Diverged cases (%)' if as_percent else 'Diverged cases (count)')
 	ax.set_title('Failures (diverged)')
 	ax.grid(axis='y', alpha=0.25, linewidth=0.25)
@@ -266,7 +330,7 @@ def _draw_grouped_violins(
 	for ci, cat in enumerate(categories):
 		for mi, method in enumerate(methods):
 			sub = df_ok[(df_ok['category'] == cat) & (df_ok['pred_folder'] == method)]
-			v = sub[metric].dropna().values
+			v = _values_for_plot(sub[metric].dropna().values, metric)
 			if len(v) == 0:
 				continue
 			offset = (mi - (n_m - 1) / 2.0) * width
@@ -290,7 +354,7 @@ def _draw_grouped_violins(
 		parts['cmedians'].set_color('black')
 
 	ax.set_xticks(range(len(categories)))
-	ax.set_xticklabels([_format_folder_label(c) for c in categories], rotation=rotation, ha='right')
+	ax.set_xticklabels([_format_folder_label(c) for c in categories], rotation=rotation, ha='right', fontsize=X_TICK_LABELSIZE)
 	if set_ylim_fn:
 		set_ylim_fn(ax)
 	ax.grid(axis='y', alpha=0.25, linewidth=0.25)
@@ -334,7 +398,7 @@ def plot_violins_by_category(
 	for idx, metric in enumerate(metric_cols):
 		_draw_grouped_violins(
 			axes[idx], df, metric, categories, methods, method_colors, rotation,
-			set_ylim_fn=lambda a, m=metric: _set_ylim(a, m),
+			set_ylim_fn=lambda a, m=metric: _set_mesh_metric_ylim(a, m),
 			show_legend=(idx == 0),
 			method_labels=method_labels,
 		)
@@ -367,7 +431,7 @@ def plot_violins_by_category_single_figure(
 		fig, ax = plt.subplots(figsize=figsize)
 		_draw_grouped_violins(
 			ax, df, metric, categories, methods, method_colors, rotation,
-			set_ylim_fn=lambda a, m=metric: _set_ylim(a, m),
+			set_ylim_fn=lambda a, m=metric: _set_mesh_metric_ylim(a, m),
 			show_legend=True,
 			method_labels=method_labels,
 		)
@@ -423,7 +487,7 @@ def plot_violins(
 			sub = data[data['pred_folder'] == c]
 			if len(sub):
 				cases = sub['case'].astype(str).values if has_case else None
-				groups.append((c, sub[metric].values, cases))
+				groups.append((c, _values_for_plot(sub[metric].values, metric), cases))
 		if not groups:
 			ax.text(0.5, 0.5, 'No data', ha='center', va='center', transform=ax.transAxes)
 			continue
@@ -439,12 +503,15 @@ def plot_violins(
 			colors,
 			_metric_label(metric),
 			group_order=None,
-			set_ylim=lambda a, m=metric: _set_ylim(a, m),
-			add_wilcoxon=2 <= len(folders_used) <= 3,
+			set_ylim=lambda a, m=metric: _set_mesh_metric_ylim(a, m),
+			add_wilcoxon=2 <= len(folders_used) <= 4,
 			patients_by_group=patients,
 			subplot_label=chr(97 + idx),
 			xtick_rotation=rotation,
 		)
+		ax.tick_params(axis='x', labelsize=X_TICK_LABELSIZE)
+		if metric in YAXIS_YMIN_BY_METRIC:
+			_set_mesh_metric_ylim(ax, metric)
 
 	for j in range(idx + 1, len(axes)):
 		axes[j].set_visible(False)
@@ -479,7 +546,7 @@ def plot_violins_single_figure(
 			sub = data[data['pred_folder'] == c]
 			if len(sub):
 				cases = sub['case'].astype(str).values if has_case else None
-				groups.append((c, sub[metric].values, cases))
+				groups.append((c, _values_for_plot(sub[metric].values, metric), cases))
 		if not groups:
 			ax.text(0.5, 0.5, 'No data', ha='center', va='center', transform=ax.transAxes)
 		else:
@@ -495,11 +562,14 @@ def plot_violins_single_figure(
 				colors,
 				_metric_label(metric),
 				group_order=None,
-				set_ylim=lambda a, m=metric: _set_ylim(a, m),
-				add_wilcoxon=2 <= len(folders_used) <= 3,
+				set_ylim=lambda a, m=metric: _set_mesh_metric_ylim(a, m),
+				add_wilcoxon=2 <= len(folders_used) <= 4,
 				patients_by_group=patients,
 				xtick_rotation=rotation,
 			)
+			ax.tick_params(axis='x', labelsize=X_TICK_LABELSIZE)
+			if metric in YAXIS_YMIN_BY_METRIC:
+				_set_mesh_metric_ylim(ax, metric)
 		fig.tight_layout()
 		safe_name = re.sub(r'[^\w\-]', '_', metric)
 		out_path = os.path.join(out_dir, f'violin_{safe_name}.{fmt}')
@@ -522,8 +592,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 	)
 	p.add_argument('--out-dir', default=None, help='Output directory for figures (default: input_dir)')
 	p.add_argument('--out', default=None, help='Output path for combined figure (default: violin_mesh_metrics.<fmt> in out-dir)')
-	p.add_argument('--metrics', default=None, metavar='M1,M2,...', help='Comma-separated metrics to plot. Default: standard scalar metric set.')
+	p.add_argument('--metrics', default=None, metavar='M1,M2,...', help='Comma-separated metrics to plot. Default: all numeric CSV columns (except per-radius buckets and metadata), skipping any column that is all NaN.')
 	p.add_argument('--categories', default=None, metavar='JSON', help='Path to categories.json {category: [cases]}. If set, violins are grouped by anatomy category on the x-axis (methods shown as colors).')
+	p.add_argument('--skip-cases', default=None, metavar='C1,C2,...', help='Comma-separated case names to exclude from all plots (including failure counts).')
 	p.add_argument('--drop-uncategorized', action='store_true', help='With --categories, drop cases not listed in the JSON instead of grouping them as "uncategorized".')
 	p.add_argument('--separate', action='store_true', help='Save one figure per metric instead of a combined grid')
 	p.add_argument('--rotation', type=int, default=15, help='Rotation for x-axis labels (default: 15)')
@@ -545,10 +616,26 @@ def main(argv: list[str] | None = None) -> int:
 		print(f'Error: No {args.stem}_*.csv (or {args.stem}.csv) files found in {indir}', file=sys.stderr)
 		return 2
 
-	metrics_to_plot = [m.strip() for m in args.metrics.split(',')] if args.metrics else DEFAULT_METRICS
-	metric_cols = _get_numeric_metric_columns(df, metrics_to_plot)
-	# Grouping columns are never metrics to plot
-	metric_cols = [c for c in metric_cols if c not in ('pred_folder', 'category')]
+	skip_cases = _parse_skip_cases(args.skip_cases)
+	if skip_cases:
+		if 'case' in df.columns:
+			present = set(df['case'].astype(str))
+			missing = sorted(skip_cases - present)
+			if missing:
+				print(f'Warning: --skip-cases not found in data: {", ".join(missing)}', file=sys.stderr)
+			n_before = len(df)
+			df = _filter_skip_cases(df, skip_cases)
+			n_skipped = n_before - len(df)
+			if n_skipped:
+				print(f'Skipped {n_skipped} row(s) for case(s): {", ".join(sorted(skip_cases & present))}')
+			if df.empty:
+				print('Error: No rows left after --skip-cases filtering', file=sys.stderr)
+				return 3
+		else:
+			print('Warning: --skip-cases ignored (no case column in input CSVs)', file=sys.stderr)
+
+	metrics_to_plot = [m.strip() for m in args.metrics.split(',')] if args.metrics else None
+	metric_cols = _get_plot_metric_columns(df, metrics_to_plot)
 	if not metric_cols:
 		print('Error: No matching numeric metric columns found.', file=sys.stderr)
 		return 3

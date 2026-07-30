@@ -17,14 +17,18 @@ def taubin_smooth_mesh(poly, iteration=25, boundary=False, feature=False, smooth
     """
     Apply Taubin smoothing to a VTK PolyData mesh.
     Uses vtkWindowedSincPolyDataFilter (implements Taubin's λ/μ algorithm).
+
+    Normals are recomputed after smoothing, since moving the points
+    invalidates any normals stored on the input mesh.
     """
-    return vf.smooth_polydata(
+    smoothed = vf.smooth_polydata(
         poly,
         iteration=iteration,
         boundary=boundary,
         feature=feature,
         smoothingFactor=smoothing_factor,
     )
+    return vf.compute_normals(smoothed)
 
 
 if __name__ == "__main__":

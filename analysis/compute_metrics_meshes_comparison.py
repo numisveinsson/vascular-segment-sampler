@@ -26,6 +26,10 @@ Example:
 			--out-csv metrics.csv --clip --centerline-dir /data/centerlines \
 			--clip-output-dir /data/clipped_meshes
 
+	# write hole-filled meshes only (no clipping)
+	python -m analysis.compute_metrics_meshes /data/gt_vtps /data/pred_vtps \
+			--out-csv metrics.csv --write-out-meshes --out-dir /data/metrics_output
+
 	# multiple prediction folders: compare gt_dir to each subfolder of predictions_root, write summary.csv
 	python -m analysis.compute_metrics_meshes /data/gt_vtps /data/pred_dummy \
 			--predictions-root /data/prediction_runs --summary-csv summary.csv
@@ -237,7 +241,7 @@ def clip_surface_mesh(surface: vtk.vtkPolyData, centerline: vtk.vtkPolyData, cas
 	case_name : str, optional
 		Case name for temporary file naming (if temp_dir provided)
 	temp_dir : str, optional
-		Directory for temporary clipping box files (optional)
+		Directory for clipping box .vtp files. If None, boxes are used in-memory only.
 	box_scale : float, optional
 		Size of each clipping box as a multiple of the local centerline radius (default: 5.0).
 		Larger values keep more of the surface around each centerline endpoint.
@@ -257,13 +261,11 @@ def clip_surface_mesh(surface: vtk.vtkPolyData, centerline: vtk.vtkPolyData, cas
 	endpts, radii, unit_vecs = bryan_get_clipping_parameters(centerline)
 	
 	# Generate oriented boxes for clipping
-	# Use a temporary directory or current directory if not provided
-	if temp_dir is None:
-		temp_dir = os.path.dirname(os.path.abspath(__file__))
-	os.makedirs(temp_dir, exist_ok=True)
+	if temp_dir is not None:
+		os.makedirs(temp_dir, exist_ok=True)
 	
 	box_name = f"{case_name}_boxclips" if case_name else "boxclips"
-	boxpd, _ = bryan_generate_oriented_boxes(endpts, unit_vecs, radii, box_name, temp_dir, box_scale)
+	boxpd, _ = bryan_generate_oriented_boxes(endpts, unit_vecs, radii, box_name, temp_dir or '', box_scale)
 	
 	# Clip the surface
 	clippedpd = bryan_clip_surface(surface, boxpd)
@@ -1160,8 +1162,8 @@ def compute_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData, max_po
 	# Surface Dice at two fixed tolerances (e.g. 1.0 and 2.0 in mesh units)
 	if do_surface_dice:
 		try:
-			t1 = 0.02
-			t2 = 0.05
+			t1 = 0.1
+			t2 = 0.2
 			result['surface_dice_t1'] = surface_dice(gt_poly, pred_poly, tolerance=t1, max_points=max_points)
 			result['surface_dice_t2'] = surface_dice(gt_poly, pred_poly, tolerance=t2, max_points=max_points)
 		except Exception:
@@ -1402,7 +1404,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 	p.add_argument('--gt-dir', required=True, help='Ground-truth directory containing .vtp files')
 	p.add_argument('--pred-dir', dest='pred_dir_opt', default=None, help='Prediction directory containing .vtp files (named alternative to positional pred_dir)')
 	p.add_argument('--predictions-root', default=None, help='Folder containing multiple prediction subfolders. If set, metrics are computed for each subfolder and summary.csv is written with mean and std per prediction folder.')
-	p.add_argument('--out-dir', default=None, help='Single output directory for all generated files (per-case CSVs, summary CSV, raw CSVs, and clipped meshes). Defaults to <pred-dir> or <predictions-root>.')
+	p.add_argument('--out-dir', default=None, help='Single output directory for all generated files (per-case CSVs, summary CSV, raw CSVs, clipped meshes, and hole_filled/ subfolder). Defaults to <pred-dir> or <predictions-root>.')
 	p.add_argument('--summary-csv', default=None, help='Output path for summary CSV when using --predictions-root (default: <predictions-root>/summary.csv)')
 	p.add_argument('--out-csv', default=None, help='Output CSV path (single pred dir). With --predictions-root, per-folder CSVs are written as <stem>_<pred_folder>.csv. Default: <pred-dir>/mesh_metrics.csv or <predictions-root>/mesh_metrics.csv')
 	p.add_argument('--metrics', type=parse_metrics_arg, default=None, metavar='M1,M2,...', help=f'Comma-separated metrics to compute. Default: all. Valid: {", ".join(sorted(METRIC_NAMES))}')
@@ -1416,8 +1418,9 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 	p.add_argument('--spacing', default='1.0', help='Voxel spacing for Dice voxelization (full occupancy, no sampling). Single float or comma-separated three floats (e.g. "1.0" or "0.5,0.5,1.0"). Default: 1.0 (isotropic).')
 	p.add_argument('--centerline-dir', default=None, help='Directory containing centerline .vtp files. Required if --clip is used. If provided, centerline overlap metric will be computed.')
 	p.add_argument('--clip', action='store_true', help='Clip meshes using centerlines before computing metrics. Requires --centerline-dir.')
-	p.add_argument('--clip-temp-dir', default=None, help='Temporary directory for clipping box files (default: same as script directory)')
+	p.add_argument('--clip-temp-dir', default=None, help='Directory for clipping box .vtp files (default: same as --clip-output-dir / --out-dir)')
 	p.add_argument('--clip-output-dir', default=None, help='Directory to write clipped meshes for debugging. Default: <pred-dir> when --clip is used.')
+	p.add_argument('--write-out-meshes', action='store_true', help='Write hole-filled meshes under <out-dir>/hole_filled/ (and clipped meshes when --clip is used). Implied by --clip.')
 	p.add_argument('--quiet', action='store_true', help='Reduce logging')
 	return p.parse_args(argv)
 
@@ -1439,6 +1442,7 @@ def run_metrics_for_pred_dir(
 	max_mesh_range: Optional[float] = None,
 	fill_holes: bool = True,
 	fill_holes_size: float = 1e30,
+	hole_filled_output_dir: Optional[str] = None,
 ) -> List[dict]:
 	"""Run metrics for all matching cases between gt_dir and pred_dir. Returns list of per-case rows.
 
@@ -1474,6 +1478,10 @@ def run_metrics_for_pred_dir(
 			if fill_holes:
 				gt_poly = fill_mesh_holes(gt_poly, hole_size=fill_holes_size)
 				pred_poly = fill_mesh_holes(pred_poly, hole_size=fill_holes_size)
+				if hole_filled_output_dir is not None:
+					os.makedirs(hole_filled_output_dir, exist_ok=True)
+					write_vtp(os.path.join(hole_filled_output_dir, f'{case}_gt_hole_filled{ext}'), gt_poly)
+					write_vtp(os.path.join(hole_filled_output_dir, f'{case}_pred_hole_filled{ext}'), pred_poly)
 			metrics = compute_metrics(gt_poly, pred_poly, max_points=max_points, voxel_spacing=voxel_spacing, centerline=centerline, metrics_to_compute=metrics_to_compute, min_seg=min_seg, max_mesh_range=max_mesh_range)
 			row = {'case': case}
 			row.update(metrics)
@@ -1519,6 +1527,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 	centerline_dir = args.centerline_dir
 	clip_temp_dir = args.clip_temp_dir
 	clip_output_dir = args.clip_output_dir
+	write_out_meshes = getattr(args, 'write_out_meshes', False) or clip
 	metrics_to_compute = getattr(args, 'metrics', None)
 
 	if metrics_to_compute is not None:
@@ -1563,6 +1572,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 			clip_output_dir = output_base
 		else:
 			clip_output_dir = os.path.join(output_base, os.path.basename(os.path.normpath(clip_output_dir)))
+		if clip_temp_dir is None:
+			clip_temp_dir = clip_output_dir
+	hole_filled_output_dir = os.path.join(output_base, 'hole_filled') if (write_out_meshes and fill_holes) else None
 
 	# Validate clipping arguments
 	if clip:
@@ -1602,6 +1614,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 			pred_path = os.path.join(predictions_root, pred_folder)
 			if not args.quiet:
 				print(f'Prediction folder: {pred_folder}')
+			pred_hole_filled_dir = (
+				os.path.join(hole_filled_output_dir, pred_folder)
+				if hole_filled_output_dir is not None else None
+			)
 			rows = run_metrics_for_pred_dir(
 				gt_dir, pred_path, ext, max_points, min_seg, spacing,
 				clip, centerline_dir, clip_temp_dir, clip_output_dir, args.quiet,
@@ -1610,6 +1626,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 				max_mesh_range=max_mesh_range,
 				fill_holes=fill_holes,
 				fill_holes_size=fill_holes_size,
+				hole_filled_output_dir=pred_hole_filled_dir,
 			)
 			if not rows:
 				if not args.quiet:
@@ -1661,6 +1678,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 		os.makedirs(clip_output_dir, exist_ok=True)
 		if not args.quiet:
 			print(f'Clipped meshes will be saved to: {clip_output_dir}')
+	if hole_filled_output_dir is not None:
+		os.makedirs(hole_filled_output_dir, exist_ok=True)
+		if not args.quiet:
+			print(f'Hole-filled meshes will be saved to: {hole_filled_output_dir}')
 
 	pairs = find_matching_vtps(gt_dir, pred_dir, ext=ext)
 	if not pairs:
@@ -1725,6 +1746,11 @@ def main(argv: Optional[List[str]] = None) -> int:
 			if fill_holes:
 				gt_poly = fill_mesh_holes(gt_poly, hole_size=fill_holes_size)
 				pred_poly = fill_mesh_holes(pred_poly, hole_size=fill_holes_size)
+				if hole_filled_output_dir is not None:
+					write_vtp(os.path.join(hole_filled_output_dir, f'{case}_gt_hole_filled{ext}'), gt_poly)
+					write_vtp(os.path.join(hole_filled_output_dir, f'{case}_pred_hole_filled{ext}'), pred_poly)
+					if not args.quiet:
+						print(f'  Saved hole-filled meshes: {case}_gt_hole_filled{ext}, {case}_pred_hole_filled{ext}')
 
 			spacing = parse_spacing_arg(args.spacing) if getattr(args, 'spacing', None) is not None else None
 			metrics = compute_metrics(gt_poly, pred_poly, max_points=max_points, voxel_spacing=spacing, centerline=centerline, metrics_to_compute=metrics_to_compute, min_seg=min_seg, max_mesh_range=max_mesh_range)
@@ -1787,6 +1813,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 		print(f'Average Centerline Overlap over {len(centerline_overlap_list)} cases: {float(np.mean(centerline_overlap_list)):.6g}')
 	if clip_output_dir is not None:
 		print(f'Clipped meshes saved to: {clip_output_dir}')
+	if hole_filled_output_dir is not None:
+		print(f'Hole-filled meshes saved to: {hole_filled_output_dir}')
 
 	print(f'Wrote per-case results to: {out_csv}')
 	return 0

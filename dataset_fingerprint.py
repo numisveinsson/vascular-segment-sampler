@@ -500,35 +500,46 @@ def check_file_type_mismatches(base_folder, restrict_case_names=None):
 
 
 def check_name_consistency(base_folder, restrict_case_names=None):
-    """Check if filenames match across all subfolders."""
+    """Check if filenames match across present subfolders."""
     subfolders = ['images', 'surfaces', 'centerlines', 'truths']
     name_sets = {}
+    existing_subfolders = []
 
     for subfolder in subfolders:
         folder_path = os.path.join(base_folder, subfolder)
+        if os.path.isdir(folder_path):
+            existing_subfolders.append(subfolder)
         name_sets[subfolder] = get_base_names(folder_path)
 
     if restrict_case_names is not None:
         name_sets = {k: (v & restrict_case_names) for k, v in name_sets.items()}
 
-    # Find common and unique names
+    # Find common and unique names across folders that exist on disk
     all_names = set()
-    for names in name_sets.values():
-        all_names.update(names)
-    
+    for subfolder in existing_subfolders:
+        all_names.update(name_sets[subfolder])
+
+    populated_sets = [
+        name_sets[subfolder]
+        for subfolder in existing_subfolders
+        if name_sets[subfolder]
+    ]
     consistency_report = {
         'total_unique_names': len(all_names),
         'names_per_folder': {k: len(v) for k, v in name_sets.items()},
-        'common_to_all': set.intersection(*name_sets.values()) if all(name_sets.values()) else set(),
+        'present_subfolders': existing_subfolders,
+        'common_to_all': (
+            set.intersection(*populated_sets) if populated_sets else set()
+        ),
     }
-    
-    # Find missing files per folder
-    for subfolder in subfolders:
+
+    # Find missing files only for subfolders that exist
+    for subfolder in existing_subfolders:
         if name_sets[subfolder]:
             missing = all_names - name_sets[subfolder]
             if missing:
                 consistency_report[f'missing_in_{subfolder}'] = list(missing)
-    
+
     return consistency_report, name_sets
 
 
@@ -543,7 +554,8 @@ def fingerprint_dataset(
     Extract comprehensive fingerprint of a medical imaging dataset.
 
     Args:
-        base_folder: Path to folder containing images/, surfaces/, centerlines/, truths/ subfolders
+        base_folder: Path to folder containing images/ (required) and optional
+            surfaces/, centerlines/, truths/ subfolders
         output_file: Optional path to save JSON report
         max_samples: Optional limit on number of files to analyze (for large datasets)
         config_path: Optional YAML path (same shape as pipeline configs). DATA_DIR is taken from
@@ -628,10 +640,15 @@ def fingerprint_dataset(
     for folder, count in consistency_report['names_per_folder'].items():
         print(f"  {folder}: {count} files")
 
-    # Only process cases in both images and truths
+    # Process cases in images; intersect with truths when that folder is present
     image_names = set(name_sets.get('images', set()))
     truth_names = set(name_sets.get('truths', set()))
-    folder_common_names = image_names & truth_names
+    truths_folder = os.path.join(base_folder, 'truths')
+    has_truths = os.path.isdir(truths_folder) and bool(truth_names)
+    if has_truths:
+        folder_common_names = image_names & truth_names
+    else:
+        folder_common_names = image_names
     common_names = sorted(folder_common_names)
 
     config_meta = None
@@ -664,15 +681,19 @@ def fingerprint_dataset(
                 f"{config_meta['note']}"
             )
 
-    print(f"  Cases in both images and truths (folder): {len(folder_common_names)}")
+    if has_truths:
+        print(f"  Cases in both images and truths (folder): {len(folder_common_names)}")
+    else:
+        print(f"  Cases in images folder: {len(folder_common_names)}")
     if config_meta and config_meta.get('cases_after_filter') is not None:
         print(f"  Cases after config cohort filter: {config_meta['cases_after_filter']}")
-    if len(image_names) > len(folder_common_names):
-        missing_truths = len(image_names - truth_names)
-        print(f"    ({missing_truths} images without corresponding truths)")
-    if len(truth_names) > len(folder_common_names):
-        missing_images = len(truth_names - image_names)
-        print(f"    ({missing_images} truths without corresponding images)")
+    if has_truths:
+        if len(image_names) > len(folder_common_names):
+            missing_truths = len(image_names - truth_names)
+            print(f"    ({missing_truths} images without corresponding truths)")
+        if len(truth_names) > len(folder_common_names):
+            missing_images = len(truth_names - image_names)
+            print(f"    ({missing_images} truths without corresponding images)")
 
     if max_samples and len(common_names) > max_samples:
         print(f"\nLimiting analysis to {max_samples} samples (out of {len(common_names)})")

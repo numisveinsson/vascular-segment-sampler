@@ -217,7 +217,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 	p.add_argument(
 		'--clip-temp-dir',
 		default=None,
-		help='Temporary directory for clipping box files',
+		help='Directory for clipping box .vtp files (default: same as --out-dir)',
 	)
 	p.add_argument(
 		'--quiet',
@@ -264,6 +264,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 		if not os.path.isdir(centerline_dir):
 			print(f'Error: Centerline directory does not exist: {centerline_dir}', file=sys.stderr)
 			return 1
+		if clip_temp_dir is None:
+			clip_temp_dir = out_dir
 
 	metric_keys = [k for k in RESULTS_FIELDNAMES if k not in ('case', 'status', 'mesh_range')]
 	summary_rows = []

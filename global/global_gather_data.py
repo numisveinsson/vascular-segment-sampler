@@ -229,6 +229,10 @@ if __name__ == '__main__':
                         f"No surface mesh found for case {case_dict['NAME']} under "
                         f"{os.path.join(data_dir_ts, 'surfaces')} (.vtp or .stl)"
                     )
+                print(
+                    f"{case_dict['NAME']}: converting surface to segmentation at "
+                    f"target spacing {list(args.target_spacing)} ({surf_path})"
+                )
                 mod = _get_create_seg_surf_mod()
                 surface = mod.load_surface_polydata(surf_path)
                 # Build the exact image grid first, then rasterize truth on this same grid.

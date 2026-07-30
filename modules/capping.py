@@ -170,10 +170,10 @@ def bryan_generate_oriented_boxes(endpts, unit_tan_vectors, radius,
     # Write the oriented box to a .vtp file
     if outdir:
         os.makedirs(outdir, exist_ok=True)
-    writer = vtk.vtkXMLPolyDataWriter()
-    writer.SetFileName(os.path.join(outdir, output_file + '.vtp'))
-    writer.SetInputData(box_surfaces.GetOutput())
-    writer.Write()
+        writer = vtk.vtkXMLPolyDataWriter()
+        writer.SetFileName(os.path.join(outdir, output_file + '.vtp'))
+        writer.SetInputData(box_surfaces.GetOutput())
+        writer.Write()
     return box_surfaces.GetOutput(), pd_lst
 
 

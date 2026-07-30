@@ -102,6 +102,20 @@ VIEW_DIRECTIONS: Dict[str, Tuple[Tuple[float, float, float], Tuple[float, float,
 }
 
 
+def _recompute_normals(poly: vtk.vtkPolyData) -> vtk.vtkPolyData:
+	"""Recompute point and cell normals (e.g. after clipping or when VTP normals are missing/stale)."""
+	if vf is not None:
+		return vf.compute_normals(poly)
+	normals = vtk.vtkPolyDataNormals()
+	normals.SetInputData(poly)
+	normals.ComputePointNormalsOn()
+	normals.ComputeCellNormalsOn()
+	normals.ConsistencyOn()
+	normals.AutoOrientNormalsOn()
+	normals.Update()
+	return normals.GetOutput()
+
+
 def _named_color(name_or_rgb) -> Tuple[float, float, float]:
 	"""Resolve a color given as an RGB tuple (0-1) or a VTK color name string."""
 	if isinstance(name_or_rgb, (tuple, list)) and len(name_or_rgb) == 3:
@@ -474,6 +488,7 @@ def render_case_comparison(
 				except Exception as e:
 					if not quiet:
 						print(f'  Warning: clipping failed for {case} [{label}]: {e}. Using unclipped mesh.', file=sys.stderr)
+			poly = _recompute_normals(poly)
 			loaded.append((label, poly))
 		except Exception as e:
 			if not quiet:
@@ -584,7 +599,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 	p.add_argument('--centerline-dir', '--dir-cent', dest='centerline_dir', default=None,
 		help='Directory containing centerline .vtp files (matched by case name). Required with --clip.')
 	p.add_argument('--clip-temp-dir', default=None,
-		help='Temporary directory for clipping box files (default: script directory)')
+		help='Directory for clipping box .vtp files (default: same as --out-dir)')
 	p.add_argument('--quiet', action='store_true', help='Reduce logging')
 	return p.parse_args(argv)
 
@@ -619,6 +634,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 		else os.path.join(pred_dir, 'renders')
 	)
 	os.makedirs(output_base, exist_ok=True)
+	if clip and clip_temp_dir is None:
+		clip_temp_dir = output_base
 
 	color = args.color
 	background = args.background
@@ -642,9 +659,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 			return 2
 		cases = sorted(common_cases)
 		if not args.quiet:
-			print(f'Rendering {len(cases)} cases: GT + {len(subdirs)} prediction folders -> {output_base}')
+			print(f'Rendering {len(cases)} cases: Manual + {len(subdirs)} prediction folders -> {output_base}')
 		for case in tqdm(cases, desc='Cases', disable=args.quiet):
-			mesh_paths = [('GT', os.path.join(gt_dir, case + ext))]
+			mesh_paths = [('Manual', os.path.join(gt_dir, case + ext))]
 			for name, d in zip(subdirs, pred_dirs):
 				mesh_paths.append((name, os.path.join(d, case + ext)))
 			centerline_path = os.path.join(centerline_dir, case + ext) if clip and centerline_dir else None
@@ -666,9 +683,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 		print(f'No matching {ext} files found in {gt_dir} and {pred_dir}', file=sys.stderr)
 		return 2
 	if not args.quiet:
-		print(f'Rendering {len(pairs)} cases: GT vs pred -> {output_base}')
+		print(f'Rendering {len(pairs)} cases: Manual vs pred -> {output_base}')
 	for case, gt_path, pred_path in tqdm(pairs, desc='Cases', disable=args.quiet):
-		mesh_paths = [('GT', gt_path), ('pred', pred_path)]
+		mesh_paths = [('Manual', gt_path), ('pred', pred_path)]
 		centerline_path = os.path.join(centerline_dir, case + ext) if clip and centerline_dir else None
 		render_case_comparison(
 			case, mesh_paths, output_base, args.views, args.window_size,

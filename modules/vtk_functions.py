@@ -1172,6 +1172,32 @@ def smooth_polydata(poly, iteration=25, boundary=False, feature=False, smoothing
     return smoothed
 
 
+def compute_normals(poly, flip=False):
+    """
+    Recompute point and cell normals on a vtk polydata.
+
+    Useful after operations that move points (e.g. smoothing), since any
+    pre-existing normals become stale.
+
+    Args:
+        poly: vtk polydata
+        flip: flip the computed normals
+    Returns:
+        polydata with recomputed normals
+    """
+    normals = vtk.vtkPolyDataNormals()
+    normals.SetInputData(poly)
+    normals.ComputePointNormalsOn()
+    normals.ComputeCellNormalsOn()
+    normals.ConsistencyOn()
+    normals.AutoOrientNormalsOn()
+    if flip:
+        normals.FlipNormalsOn()
+    normals.Update()
+
+    return normals.GetOutput()
+
+
 def laplacian_smooth_polydata(poly, iteration=25, relaxation=0.1, boundary=False, feature=False):
     """
     Apply VTK Laplacian smoothing to a vtk polydata using vtkSmoothPolyDataFilter.
