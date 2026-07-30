@@ -1,0 +1,68 @@
+# Minimal test configuration for main_with_nnunet.py
+# This config is designed to work with tests/data/
+
+DATASET_NAME: 'other'
+IMG_EXT: '.mha'
+
+BINARIZE: True
+ANATOMY: ['Aorta']
+OUTLET_CLASSES: [0,1,2,3,4,5,6,7,8,9,10]
+SCALED: False
+CROPPED: False
+
+EXTRACT_VOLUMES: True
+ROTATE_VOLUMES: False
+
+RESAMPLE_VOLUMES: False
+RESAMPLE_SIZE: [64, 64, 64]
+# FIXED_EXTRACT_SIZE: [64, 64, 64]  # Optional: extract always same voxel size (and same physical size for same spacing). Uncomment to enable; omit for radius-based variable extraction.
+
+AUGMENT_VOLUMES: False
+
+WRITE_SAMPLES: True
+WRITE_IMG: True
+REMOVE_OTHER: False  # Set to False for testing to avoid issues
+WRITE_SURFACE: False  # Set to False to avoid requiring surfaces
+WRITE_CENTERLINE: False
+WRITE_VOXEL_PYRAMID: False
+
+WRITE_DISCRETE_CENTERLINE: False
+DISCRETE_CENTERLINE_N_POINTS: 10
+
+WRITE_OUTLET_STATS: False
+WRITE_OUTLET_IMG: False
+UPSAMPLE_OUTLET_IMG: False
+
+WRITE_CROSS_SECTIONAL: False
+NUM_CROSS_SECTIONS: 2
+RESAMPLE_CROSS_IMG: 400
+WRITE_TRAJECTORIES: False
+N_SLICES: 20
+
+WRITE_VTK: False
+WRITE_VTK_THROWOUT: False
+
+MOVE_DIST: 1.5
+SIZE_RADIUS: 5
+RADIUS_ADD: 0.1
+RADIUS_SCALE: 1.0
+
+CAPFREE: False  # Set to False to avoid requiring surfaces
+CAPFREE_PROP: 0.0
+MOVE_SLOWER_LARGE: 0.5
+MU_SIZE: 5
+SIGMA_SIZE: 0.8
+MU_SHIFT: 0
+SIGMA_SHIFT: 0.8
+NUMBER_SAMPLES: 1  # Minimal samples for testing
+NUMBER_SAMPLES_BIFURC: 1
+NUMBER_SAMPLES_START: 1
+MOVE_SLOWER_BIFURC: 1
+
+# Test case
+TEST_CASES:
+  - '0066_0001'
+
+# No bad cases for testing
+BAD_CASES: []
+

@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vascular-segment-sampler"
+version = "0.1.0"
+description = "Extract vascular segment patches from medical images and convert them to nnU-Net datasets."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Numi Sveinsson Cepero"},
+]
+dependencies = [
+    "numpy",
+    "pandas",
+    "PyYAML",
+    "tqdm",
+    "SimpleITK",
+    "vtk",
+]
+
+[project.optional-dependencies]
+traj = ["scipy"]
+dev = ["pytest>=7"]
+
+[project.scripts]
+vss-sample = "vascular_segment_sampler.cli:sample_main"
+vss-to-nnunet = "vascular_segment_sampler.cli:nnunet_main"
+
+[project.urls]
+homepage = "https://github.com/numisveinsson/vascular-segment-sampler"
+repository = "https://github.com/numisveinsson/vascular-segment-sampler"
+
+[tool.setuptools.packages.find]
+include = ["vascular_segment_sampler*"]
+
+[tool.setuptools.package-data]
+"vascular_segment_sampler" = [
+    "config/*.yaml",
+    "*.csv",
+]

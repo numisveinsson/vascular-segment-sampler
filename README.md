@@ -27,34 +27,58 @@ The fundamental idea is to 'piece up' vasculature into hundreds/thousands of vas
 
 ## Installation
 
-Install the required dependencies using conda:
+### Pip (recommended)
+
+```bash
+pip install -e .
+# Optional: trajectory extraction (WRITE_TRAJECTORIES)
+pip install -e ".[traj]"
+```
+
+From another project (e.g. SeqSeg):
+
+```bash
+pip install "seqseg[train]"
+# or editable local:
+pip install -e ../vascular-segment-sampler
+```
+
+Python API:
+
+```python
+from vascular_segment_sampler.sampling import extract_patches
+from vascular_segment_sampler.nnunet import write_nnunet_dataset
+
+extract_patches(data_dir=..., outdir=..., config="global")
+write_nnunet_dataset(indir=..., name="MYDATA", dataset_number=999, modality="ct")
+```
+
+Console scripts: `vss-sample`, `vss-to-nnunet`.
+
+### Conda
 
 ```bash
 conda env create -f environment.yml
 conda activate vascular-segment-sampler
-```
-
-Or create the environment with a custom name:
-
-```bash
-conda env create -f environment.yml -n vascular-segment-sampler
-conda activate vascular-segment-sampler
+pip install -e .
 ```
 
 ## Project Structure
 
 ```
 vascular-segment-sampler/
-├── config/              # Configuration YAML files
-├── modules/             # Shared utility modules
-│   ├── vtk_functions.py # VTK-related functions
-│   ├── sitk_functions.py # SimpleITK-related functions
-│   └── ...
-├── preprocessing/       # Image format conversion and preprocessing
-├── global/             # Global processing scripts
-├── cardiac/            # Cardiac-specific processing
-├── tests/              # Unit tests
-└── ...
+├── vascular_segment_sampler/  # Installable package
+│   ├── sampling/              # extract_patches
+│   ├── nnunet/                # write_nnunet_dataset
+│   ├── preprocessing/
+│   └── config/
+├── config/                    # YAML configs (also packaged)
+├── modules/                   # Legacy shims → vascular_segment_sampler
+├── preprocessing/             # Standalone preprocessing scripts
+├── global/                    # Global processing scripts
+├── cardiac/                   # Cardiac-specific processing
+├── tests/                     # Unit tests
+└── pyproject.toml
 ```
 
 ## Configuration

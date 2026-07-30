@@ -1,0 +1,286 @@
+row_type,anatomy,modality_bucket,image_modality,split,n_train_in_group,n_test_in_group,legacy_name,name,disease,species,sex,age,in_vmr_split_06_ct_cohort,in_vmr_split_07_mr_cohort,in_vmr_split_06_test,in_vmr_split_07_test
+group_header,Aorta,CT,,,34,5,,,,,,,,,,
+case,Aorta,CT,CT,test,,,0174_0000,0025_H_AO_MFS,Marfan Syndrome,Human,Male,18.00,yes,no,yes,no
+case,Aorta,CT,CT,test,,,0176_0000,0027_H_AO_MFS,Marfan Syndrome,Human,Male,25.00,yes,no,yes,no
+case,Aorta,CT,CT,test,,,0188_0001_aorta,0075_H_AO_H,Healthy,Human,Female,50.00,yes,no,yes,no
+case,Aorta,CT,CT,test,,,O150323_2009_aorta,0153_H_AO_H,Healthy,Human,-,-,yes,no,yes,no
+case,Aorta,CT,CT,test,,,O344211000_2006_aorta,0157_H_AO_H,Healthy,Human,-,-,yes,no,yes,no
+case,Aorta,CT,CT,train,,,0065_1001,0003_H_AO_SVD,Single Ventricle Defect,Human,Female,5.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,0091_0001,0008_H_AO_H,Healthy,Human,Male,6.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,0092_0001,0009_H_AO_H,Healthy,Human,Male,11.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,0108_0001_aorta,0067_H_AO_H,Healthy,Human,Male,10.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,0129_0000,0021_H_AO_MFS,Marfan Syndrome,Human,Male,18.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,0175_0000,0026_H_AO_MFS,Marfan Syndrome,Human,Male,45.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,0183_1002_aorta,0070_H_AO_H,Healthy,Human,Male,24.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,0184_0001_aorta,0071_H_AO_H,Healthy,Human,Male,26.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,0187_0002_aorta,0074_H_AO_H,Healthy,Human,Male,59.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,0189_0001_aorta,0076_H_AO_H,Healthy,Human,Female,72.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,BMMB_AD_2020,0160_H_AO_AOD,Aortic Dissection,Human,Male,52.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,O0171SC_aorta,0146_H_AO_H,Healthy,Human,-,-,yes,no,no,no
+case,Aorta,CT,CT,train,,,O11908_aorta,0149_H_AO_H,Healthy,Human,-,-,yes,no,no,no
+case,Aorta,CT,CT,train,,,O128301_2008_aorta,0158_H_AO_H,Healthy,Human,-,-,yes,no,no,no
+case,Aorta,CT,CT,train,,,O145207_aorta,0152_H_AO_H,Healthy,Human,-,-,yes,no,no,no
+case,Aorta,CT,CT,train,,,O20719_2006_aorta,0150_H_AO_H,Healthy,Human,-,-,yes,no,no,no
+case,Aorta,CT,CT,train,,,O227241_2006_aorta,0154_H_AO_H,Healthy,Human,-,-,yes,no,no,no
+case,Aorta,CT,CT,train,,,O351095_2016_aorta,0155_H_AO_H,Healthy,Human,-,-,yes,no,no,no
+case,Aorta,CT,CT,train,,,O51001_2009_aorta,0151_H_AO_H,Healthy,Human,-,-,yes,no,no,no
+case,Aorta,CT,CT,train,,,O6397SC_aorta,0147_H_AO_H,Healthy,Human,-,-,yes,no,no,no
+case,Aorta,CT,CT,train,,,O8963SC_aorta,0148_H_AO_H,Healthy,Human,-,-,yes,no,no,no
+case,Aorta,CT,CT,train,,,P-11,0235_H_AO_COA,Coarctation of Aorta,Human,Female,30.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,P-12,0236_H_AO_COA,Coarctation of Aorta,Human,Male,46.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,P-13,0237_H_AO_COA,Coarctation of Aorta,Human,Male,22.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,P-14,0238_H_AO_COA,Coarctation of Aorta,Human,Female,30.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,P-15,0239_H_AO_COA,Coarctation of Aorta,Human,Male,24.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,P-16,0240_H_AO_COA,Coarctation of Aorta,Human,Male,25.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,P-3,0227_H_AO_COA,Coarctation of Aorta,Human,Male,21.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,P-4,0228_H_AO_COA,Coarctation of Aorta,Human,Male,12.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,P-5,0229_H_AO_COA,Coarctation of Aorta,Human,Male,25.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,P-6,0230_H_AO_COA,Coarctation of Aorta,Human,Female,24.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,P-7,0231_H_AO_COA,Coarctation of Aorta,Human,Male,29.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,P-9,0233_H_AO_COA,Coarctation of Aorta,Human,Male,33.00,yes,no,no,no
+case,Aorta,CT,CT,train,,,TBAD_OR,0221_H_AO_AOD,Aortic Dissection,Human,Female,25.00,yes,no,no,no
+group_header,Aorta,MR,,,37,6,,,,,,,,,,
+case,Aorta,MR,MR,test,,,0063_1001,0001_H_AO_SVD,Single Ventricle Defect,Human,Male,3.00,no,yes,no,yes
+case,Aorta,MR,MR,test,,,0070_0001,0097_A_AO_COA,Coarctation of Aorta,Animal,Male,0.62,no,yes,no,yes
+case,Aorta,MR,MR,test,,,0090_0001,0007_H_AO_H,Healthy,Human,Male,13.00,no,yes,no,yes
+case,Aorta,MR,MR,test,,,0131_0000,0023_H_AO_MFS,Marfan Syndrome,Human,Male,15.00,no,yes,no,yes
+case,Aorta,MR,MR,test,,,KDR12_aorta,0139_H_AO_H,Healthy,Human,Male,6.90,no,yes,no,yes
+case,Aorta,MR,MR,test,,,KDR33_aorta,0142_H_AO_H,Healthy,Human,Female,16.70,no,yes,no,yes
+case,Aorta,MR,MR,train,,,0064_1001,0002_H_AO_SVD,Single Ventricle Defect,Human,Female,6.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,0066_0001,0093_A_AO_H,Healthy,Animal,Male,0.62,no,yes,no,no
+case,Aorta,MR,MR,train,,,0067_0001,0094_A_AO_H,Healthy,Animal,Male,0.62,no,yes,no,no
+case,Aorta,MR,MR,train,,,0068_0001,0095_A_AO_H,Healthy,Animal,Male,0.62,no,yes,no,no
+case,Aorta,MR,MR,train,,,0069_0001,0096_A_AO_COA,Coarctation of Aorta,Animal,Male,0.62,no,yes,no,no
+case,Aorta,MR,MR,train,,,0071_0001,0098_A_AO_COA,Coarctation of Aorta,Animal,Male,0.62,no,yes,no,no
+case,Aorta,MR,MR,train,,,0072_0001,0099_A_AO_COA,Coarctation of Aorta,Animal,Male,0.62,no,yes,no,no
+case,Aorta,MR,MR,train,,,0073_0001,0100_A_AO_COA,Coarctation of Aorta,Animal,Male,0.62,no,yes,no,no
+case,Aorta,MR,MR,train,,,0074_0001,0101_A_AO_COA,Coarctation of Aorta,Animal,Male,0.62,no,yes,no,no
+case,Aorta,MR,MR,train,,,0075_1001,0004_H_AO_SVD,Single Ventricle Defect,Human,Female,17.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,0076_1001,0005_H_AO_SVD,Single Ventricle Defect,Human,Female,27.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,0077_1001,0006_H_AO_SVD,Single Ventricle Defect,Human,Female,3.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,0093_0001,0010_H_AO_H,Healthy,Human,Female,11.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,0094_0001,0011_H_AO_H,Healthy,Human,Female,23.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,0095_0001,0012_H_AO_H,Healthy,Human,Male,26.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,0101_0001,0013_H_AO_COA,Coarctation of Aorta,Human,Male,13.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,0102_0001,0014_H_AO_COA,Coarctation of Aorta,Human,Male,5.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,0103_0001,0015_H_AO_COA,Coarctation of Aorta,Human,Male,11.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,0104_0001,0016_H_AO_COA,Coarctation of Aorta,Human,Female,11.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,0105_0001,0017_H_AO_COA,Coarctation of Aorta,Human,Female,23.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,0106_0001,0018_H_AO_COA,Coarctation of Aorta,Human,Female,10.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,0107_0001,0019_H_AO_COA,Coarctation of Aorta,Human,Male,4.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,0111_0001,0020_H_AO_COA,Coarctation of Aorta,Human,Female,8.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,0130_0000,0022_H_AO_MFS,Marfan Syndrome,Human,Male,17.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,0154_0001,0024_H_AO_H,Healthy,Human,Male,23.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,KDR08_aorta,0137_H_AO_H,Healthy,Human,Male,16.70,no,yes,no,no
+case,Aorta,MR,MR,train,,,KDR10_aorta,0138_H_AO_H,Healthy,Human,Male,3.50,no,yes,no,no
+case,Aorta,MR,MR,train,,,KDR13_aorta,0140_H_AO_H,Healthy,Human,Female,0.60,no,yes,no,no
+case,Aorta,MR,MR,train,,,KDR32_aorta,0141_H_AO_H,Healthy,Human,Male,14.90,no,yes,no,no
+case,Aorta,MR,MR,train,,,KDR34_aorta,0143_H_AO_H,Healthy,Human,Male,9.10,no,yes,no,no
+case,Aorta,MR,MR,train,,,KDR48_aorta,0144_H_AO_H,Healthy,Human,Male,17.60,no,yes,no,no
+case,Aorta,MR,MR,train,,,KDR57_aorta,0145_H_AO_H,Healthy,Human,Male,11.10,no,yes,no,no
+case,Aorta,MR,MR,train,,,P-1,0225_H_AO_COA,Coarctation of Aorta,Human,Male,15.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,P-10,0234_H_AO_COA,Coarctation of Aorta,Human,Male,21.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,P-17,0241_H_AO_COA,Coarctation of Aorta,Human,Female,54.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,P-2,0226_H_AO_COA,Coarctation of Aorta,Human,Male,22.00,no,yes,no,no
+case,Aorta,MR,MR,train,,,P-8,0232_H_AO_COA,Coarctation of Aorta,Human,Male,44.00,no,yes,no,no
+group_header,Aorta,Other,,,4,0,,,,,,,,,,
+case,Aorta,Other,-,train,,,O690801_2007_aorta,0159_H_AO_H,Healthy,Human,-,-,no,no,no,no
+case,Aorta,Other,-,train,,,TBAD_EN,0222_H_AO_AOD,Aortic Dissection,Human,Female,25.00,no,no,no,no
+case,Aorta,Other,-,train,,,TBAD_EN_EX,0224_H_AO_AOD,Aortic Dissection,Human,Female,25.00,no,no,no,no
+case,Aorta,Other,-,train,,,TBAD_EX,0223_H_AO_AOD,Aortic Dissection,Human,Female,25.00,no,no,no,no
+group_header,Abdominal Aorta,CT,,,13,3,,,,,,,,,,
+case,Abdominal Aorta,CT,CT,test,,,0139_1001,0032_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,Female,79.00,yes,no,yes,no
+case,Abdominal Aorta,CT,CT,test,,,0141_1001,0034_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,Male,64.00,yes,no,yes,no
+case,Abdominal Aorta,CT,CT,test,,,0146_1001,0038_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,Male,70.00,yes,no,yes,no
+case,Abdominal Aorta,CT,CT,train,,,0003_0001,0028_H_ABAO_H,Healthy,Human,Female,21.00,yes,no,no,no
+case,Abdominal Aorta,CT,CT,train,,,0138_1001,0031_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,Male,73.00,yes,no,no,no
+case,Abdominal Aorta,CT,CT,train,,,0140_2001,0033_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,Male,76.00,yes,no,no,no
+case,Abdominal Aorta,CT,CT,train,,,0142_1001,0035_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,Male,75.00,yes,no,no,no
+case,Abdominal Aorta,CT,CT,train,,,0144_1001,0036_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,Male,66.00,yes,no,no,no
+case,Abdominal Aorta,CT,CT,train,,,0145_1001,0037_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,Male,68.00,yes,no,no,no
+case,Abdominal Aorta,CT,CT,train,,,0147_1001,0039_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,Male,63.00,yes,no,no,no
+case,Abdominal Aorta,CT,CT,train,,,0148_1001,0040_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,Male,70.00,yes,no,no,no
+case,Abdominal Aorta,CT,CT,train,,,0149_1001,0041_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,Male,75.00,yes,no,no,no
+case,Abdominal Aorta,CT,CT,train,,,0150_0001,0042_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,Male,48.00,yes,no,no,no
+case,Abdominal Aorta,CT,CT,train,,,0151_0001,0043_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,Male,71.00,yes,no,no,no
+case,Abdominal Aorta,CT,CT,train,,,0156_0001,0044_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,Male,69.00,yes,no,no,no
+case,Abdominal Aorta,CT,CT,train,,,0157_0000,0045_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,Male,71.00,yes,no,no,no
+group_header,Abdominal Aorta,MR,,,5,1,,,,,,,,,,
+case,Abdominal Aorta,MR,MR,test,,,0006_0001,0029_H_ABAO_H,Healthy,Human,Male,30.00,no,yes,no,yes
+case,Abdominal Aorta,MR,MR,train,,,0110_0001,0030_H_ABAO_H,Healthy,Human,Male,67.00,no,yes,no,no
+case,Abdominal Aorta,MR,MR,train,,,0160_6001,0046_H_ABAO_AIOD,Aortoiliac Occlusive Disease,Human,Female,67.00,no,yes,no,no
+case,Abdominal Aorta,MR,MR,train,,,0161_0001,0047_H_ABAO_AIOD,Aortoiliac Occlusive Disease,Human,Female,67.00,no,yes,no,no
+case,Abdominal Aorta,MR,MR,train,,,0162_3001,0048_H_ABAO_AIOD,Aortoiliac Occlusive Disease,Human,Male,55.00,no,yes,no,no
+case,Abdominal Aorta,MR,MR,train,,,0163_0001,0049_H_ABAO_AIOD,Aortoiliac Occlusive Disease,Human,Male,55.00,no,yes,no,no
+group_header,Abdominal Aorta,Other,,,20,0,,,,,,,,,,
+case,Abdominal Aorta,Other,-,train,,,aorta01,0179_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta02,0180_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta03,0181_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta04,0182_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta05,0183_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta06,0184_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta07,0185_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta08,0186_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta09,0187_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta10,0188_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta11,0189_H_ABAO_H,Healthy,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta12,0190_H_ABAO_H,Healthy,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta13,0191_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta14,0192_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta15,0193_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta16,0194_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta17,0195_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta18,0196_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta19,0197_H_ABAO_H,Healthy,Human,-,-,no,no,no,no
+case,Abdominal Aorta,Other,-,train,,,aorta20,0198_H_ABAO_AAA,Abdominal Aortic Aneurysm,Human,-,-,no,no,no,no
+group_header,Coronary,CT,,,25,6,,,,,,,,,,
+case,Coronary,CT,CT,test,,,0185_0001,0072_H_CORO_KD,Kawasaki Disease,Human,Female,8.00,yes,no,yes,no
+case,Coronary,CT,CT,test,,,0189_0001,0076_H_CORO_CAD,Coronary Artery Disease,Human,Female,72.00,yes,no,yes,no
+case,Coronary,CT,CT,test,,,O11908,0149_H_CORO_SVGD,Saphenous Vein Graft Disease,Human,-,-,yes,no,yes,no
+case,Coronary,CT,CT,test,,,O227241_2006,0154_H_CORO_SVGD,Saphenous Vein Graft Disease,Human,-,-,yes,no,yes,no
+case,Coronary,CT,CT,test,,,O683375_2005,0156_H_CORO_SVGD,Saphenous Vein Graft Disease,Human,-,-,yes,no,yes,no
+case,Coronary,CT,CT,test,,,RCKD24,0174_H_CORO_KD,Kawasaki Disease,Human,Male,18.00,yes,no,yes,no
+case,Coronary,CT,CT,train,,,0002_0001,0066_H_CORO_H,Healthy,Human,Female,63.00,yes,no,no,no
+case,Coronary,CT,CT,train,,,0108_0001,0067_H_CORO_KD,Kawasaki Disease,Human,Male,10.00,yes,no,no,no
+case,Coronary,CT,CT,train,,,0172_0001,0068_H_CORO_KD,Kawasaki Disease,Human,Male,14.00,yes,no,no,no
+case,Coronary,CT,CT,train,,,0173_1001,0069_H_CORO_KD,Kawasaki Disease,Human,Male,4.00,yes,no,no,no
+case,Coronary,CT,CT,train,,,0183_1002,0070_H_CORO_KD,Kawasaki Disease,Human,Male,24.00,yes,no,no,no
+case,Coronary,CT,CT,train,,,0184_0001,0071_H_CORO_KD,Kawasaki Disease,Human,Male,26.00,yes,no,no,no
+case,Coronary,CT,CT,train,,,0186_0002,0073_H_CORO_H,Healthy,Human,Female,28.00,yes,no,no,no
+case,Coronary,CT,CT,train,,,0187_0002,0074_H_CORO_KD,Kawasaki Disease,Human,Male,59.00,yes,no,no,no
+case,Coronary,CT,CT,train,,,0188_0001,0075_H_CORO_CAD,Coronary Artery Disease,Human,Female,50.00,yes,no,no,no
+case,Coronary,CT,CT,train,,,AKD3058,0169_H_CORO_KD,Kawasaki Disease,Human,Male,18.00,yes,no,no,no
+case,Coronary,CT,CT,train,,,AKD3097,0170_H_CORO_KD,Kawasaki Disease,Human,Male,28.00,yes,no,no,no
+case,Coronary,CT,CT,train,,,O0171SC,0146_H_CORO_SVGD,Saphenous Vein Graft Disease,Human,-,-,yes,no,no,no
+case,Coronary,CT,CT,train,,,O128301_2008,0158_H_CORO_SVGD,Saphenous Vein Graft Disease,Human,-,-,yes,no,no,no
+case,Coronary,CT,CT,train,,,O145207,0152_H_CORO_SVGD,Saphenous Vein Graft Disease,Human,-,-,yes,no,no,no
+case,Coronary,CT,CT,train,,,O150323_2009,0153_H_CORO_SVGD,Saphenous Vein Graft Disease,Human,-,-,yes,no,no,no
+case,Coronary,CT,CT,train,,,O20719_2006,0150_H_CORO_SVGD,Saphenous Vein Graft Disease,Human,-,-,yes,no,no,no
+case,Coronary,CT,CT,train,,,O344211000_2006,0157_H_CORO_SVGD,Saphenous Vein Graft Disease,Human,-,-,yes,no,no,no
+case,Coronary,CT,CT,train,,,O351095_2016,0155_H_CORO_SVGD,Saphenous Vein Graft Disease,Human,-,-,yes,no,no,no
+case,Coronary,CT,CT,train,,,O51001_2009,0151_H_CORO_SVGD,Saphenous Vein Graft Disease,Human,-,-,yes,no,no,no
+case,Coronary,CT,CT,train,,,O6397SC,0147_H_CORO_SVGD,Saphenous Vein Graft Disease,Human,-,-,yes,no,no,no
+case,Coronary,CT,CT,train,,,O8963SC,0148_H_CORO_SVGD,Saphenous Vein Graft Disease,Human,-,-,yes,no,no,no
+case,Coronary,CT,CT,train,,,RCKD23,0173_H_CORO_KD,Kawasaki Disease,Human,Male,12.00,yes,no,no,no
+case,Coronary,CT,CT,train,,,RCKD25,0175_H_CORO_KD,Kawasaki Disease,Human,Male,36.00,yes,no,no,no
+case,Coronary,CT,CT,train,,,RCKD26,0176_H_CORO_KD,Kawasaki Disease,Human,Male,14.00,yes,no,no,no
+case,Coronary,CT,CT,train,,,RCKD28,0178_H_CORO_KD,Kawasaki Disease,Human,Male,18.00,yes,no,no,no
+group_header,Coronary,MR,,,8,2,,,,,,,,,,
+case,Coronary,MR,MR,test,,,KDR12,0139_H_CORO_KD,Kawasaki Disease,Human,Male,6.90,no,yes,no,yes
+case,Coronary,MR,MR,test,,,KDR34,0143_H_CORO_KD,Kawasaki Disease,Human,Male,9.10,no,yes,no,yes
+case,Coronary,MR,MR,train,,,KDR01,0136_H_CORO_KD,Kawasaki Disease,Human,Male,6.80,no,yes,no,no
+case,Coronary,MR,MR,train,,,KDR08,0137_H_CORO_KD,Kawasaki Disease,Human,Male,16.70,no,yes,no,no
+case,Coronary,MR,MR,train,,,KDR10,0138_H_CORO_KD,Kawasaki Disease,Human,Male,3.50,no,yes,no,no
+case,Coronary,MR,MR,train,,,KDR13,0140_H_CORO_KD,Kawasaki Disease,Human,Female,0.60,no,yes,no,no
+case,Coronary,MR,MR,train,,,KDR32,0141_H_CORO_KD,Kawasaki Disease,Human,Male,14.90,no,yes,no,no
+case,Coronary,MR,MR,train,,,KDR33,0142_H_CORO_KD,Kawasaki Disease,Human,Female,16.70,no,yes,no,no
+case,Coronary,MR,MR,train,,,KDR48,0144_H_CORO_KD,Kawasaki Disease,Human,Male,17.60,no,yes,no,no
+case,Coronary,MR,MR,train,,,KDR57,0145_H_CORO_KD,Kawasaki Disease,Human,Male,11.10,no,yes,no,no
+group_header,Coronary,Other,,,6,0,,,,,,,,,,
+case,Coronary,Other,Ultramicroscope II light sheet microscopy,train,,,190215_P60,0107_A_CORO_H,Healthy,Animal,-,0.16,no,no,no,no
+case,Coronary,Other,Ultramicroscope II light sheet microscopy,train,,,190529_P6,0106_A_CORO_H,Healthy,Animal,-,0.02,no,no,no,no
+case,Coronary,Other,-,train,,,KD1,0171_H_CORO_KD,Kawasaki Disease,Human,-,-,no,no,no,no
+case,Coronary,Other,-,train,,,KD9,0172_H_CORO_KD,Kawasaki Disease,Human,Male,3.00,no,no,no,no
+case,Coronary,Other,-,train,,,O690801_2007,0159_H_CORO_SVGD,Saphenous Vein Graft Disease,Human,-,-,no,no,no,no
+case,Coronary,Other,-,train,,,RCKD27,0177_H_CORO_KD,Kawasaki Disease,Human,Male,25.00,no,no,no,no
+group_header,Cerebral,MR,,,3,1,,,,,,,,,,
+case,Cerebral,MR,MR,test,,,0079_0001,0051_H_CERE_H,Healthy,Human,Male,25.00,no,yes,no,yes
+case,Cerebral,MR,MR,train,,,0078_0001,0050_H_CERE_H,Healthy,Human,Female,31.00,no,yes,no,no
+case,Cerebral,MR,MR,train,,,0166_0001,0052_H_CERE_H,Healthy,Human,Female,23.00,no,yes,no,no
+case,Cerebral,MR,MR,train,,,0167_0001,0053_H_CERE_H,Healthy,Human,Female,24.00,no,yes,no,no
+group_header,Cerebral,Other,,,22,0,,,,,,,,,,
+case,Cerebral,Other,-,train,,,ANR001_Growing,0199_H_CERE_CA,Cerebral Aneurysm,Human,Male,61.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR002_Growing,0201_H_CERE_CA,Cerebral Aneurysm,Human,Male,60.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR004_Growing,0203_H_CERE_CA,Cerebral Aneurysm,Human,Female,65.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR005_Growing,0205_H_CERE_CA,Cerebral Aneurysm,Human,Female,71.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR006_Growing,0207_H_CERE_CA,Cerebral Aneurysm,Human,Female,61.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR008_Growing,0209_H_CERE_CA,Cerebral Aneurysm,Human,Female,48.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR009_Growing,0211_H_CERE_CA,Cerebral Aneurysm,Human,Female,68.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR011_Growing,0213_H_CERE_CA,Cerebral Aneurysm,Human,Female,74.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR012_Growing,0215_H_CERE_CA,Cerebral Aneurysm,Human,Female,66.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR016_Growing,0219_H_CERE_CA,Cerebral Aneurysm,Human,Female,80.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR017_Growing,0217_H_CERE_CA,Cerebral Aneurysm,Human,Female,60.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR101_Stable,0200_H_CERE_CA,Cerebral Aneurysm,Human,Male,69.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR102_Stable,0202_H_CERE_CA,Cerebral Aneurysm,Human,Female,53.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR106_Stable,0208_H_CERE_CA,Cerebral Aneurysm,Human,Female,71.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR108_Stable,0210_H_CERE_CA,Cerebral Aneurysm,Human,Male,50.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR109_Stable,0212_H_CERE_CA,Cerebral Aneurysm,Human,Female,75.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR111_Stable,0214_H_CERE_CA,Cerebral Aneurysm,Human,Female,41.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR112_Stable,0206_H_CERE_CA,Cerebral Aneurysm,Human,Female,59.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR113_Stable,0216_H_CERE_CA,Cerebral Aneurysm,Human,Female,67.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR114_Stable,0220_H_CERE_CA,Cerebral Aneurysm,Human,Female,60.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR117_Stable,0204_H_CERE_CA,Cerebral Aneurysm,Human,Female,65.00,no,no,no,no
+case,Cerebral,Other,-,train,,,ANR118_Stable,0218_H_CERE_CA,Cerebral Aneurysm,Human,Female,64.00,no,no,no,no
+group_header,Pulmonary,CT,,,6,2,,,,,,,,,,
+case,Pulmonary,CT,CT,test,,,SU0259,0109_H_PULM_H,Healthy,Human,Male,5.00,yes,no,yes,no
+case,Pulmonary,CT,CT,test,,,SU0262,0110_H_PULM_H,Healthy,Human,Male,1.00,yes,no,yes,no
+case,Pulmonary,CT,CT,train,,,0005_1001,0077_H_PULM_H,Healthy,Human,Female,67.00,yes,no,no,no
+case,Pulmonary,CT,CT,train,,,0118_1000,0089_H_PULM_ALGS,Alagille Syndrome,Human,Male,2.00,yes,no,no,no
+case,Pulmonary,CT,CT,train,,,0119_0001,0090_H_PULM_ALGS,Alagille Syndrome,Human,Male,16.00,yes,no,no,no
+case,Pulmonary,CT,CT,train,,,SU0273,0111_H_PULM_H,Healthy,Human,Male,1.67,yes,no,no,no
+case,Pulmonary,CT,CT,train,,,SU0277,0112_H_PULM_H,Healthy,Human,Female,12.75,yes,no,no,no
+case,Pulmonary,CT,CT,train,,,SU0278,0113_H_PULM_H,Healthy,Human,Female,11.00,yes,no,no,no
+group_header,Pulmonary,MR,,,32,8,,,,,,,,,,
+case,Pulmonary,MR,MR,test,,,0083_2002,0081_H_PULM_PAH,Pulmonary Arterial Hypertension,Human,Female,15.00,no,yes,no,yes
+case,Pulmonary,MR,MR,test,,,0089_1001,0087_H_PULM_PAH,Pulmonary Arterial Hypertension,Human,Female,50.00,no,yes,no,yes
+case,Pulmonary,MR,MR,test,,,0112_1001,0088_H_PULM_PAH,Pulmonary Arterial Hypertension,Human,Male,41.00,no,yes,no,yes
+case,Pulmonary,MR,MR,test,,,0134_0002,0091_H_PULM_TOF,Tetralogy of Fallot,Human,Male,31.00,no,yes,no,yes
+case,Pulmonary,MR,CT_MR,test,,,SU0206,0126_H_PULM_PAH,Pulmonary Arterial Hypertension,Human,Male,10.60,no,yes,no,yes
+case,Pulmonary,MR,CT_MR,test,,,SU0207,0127_H_PULM_PAH,Pulmonary Arterial Hypertension,Human,Female,5.30,no,yes,no,yes
+case,Pulmonary,MR,MR,test,,,SU0241,0102_H_PULM_H,Healthy,Human,Male,7.00,no,yes,no,yes
+case,Pulmonary,MR,CT_MR,test,,,WS1_SU0267_prestent,0118_H_PULM_WS,Williams Syndrome,Human,Male,0.58,no,yes,no,yes
+case,Pulmonary,MR,MR,train,,,0080_0001,0078_H_PULM_H,Healthy,Human,Female,43.00,no,yes,no,no
+case,Pulmonary,MR,MR,train,,,0081_0001,0079_H_PULM_H,Healthy,Human,Female,51.00,no,yes,no,no
+case,Pulmonary,MR,MR,train,,,0082_0001,0080_H_PULM_H,Healthy,Human,Male,35.00,no,yes,no,no
+case,Pulmonary,MR,MR,train,,,0084_0001,0082_H_PULM_H,Healthy,Human,Female,31.00,no,yes,no,no
+case,Pulmonary,MR,MR,train,,,0085_1001,0083_H_PULM_PAH,Pulmonary Arterial Hypertension,Human,Female,36.00,no,yes,no,no
+case,Pulmonary,MR,MR,train,,,0086_0001,0084_H_PULM_H,Healthy,Human,Male,21.00,no,yes,no,no
+case,Pulmonary,MR,MR,train,,,0087_1001,0085_H_PULM_PAH,Pulmonary Arterial Hypertension,Human,Male,16.00,no,yes,no,no
+case,Pulmonary,MR,MR,train,,,0088_1001,0086_H_PULM_PAH,Pulmonary Arterial Hypertension,Human,Female,19.00,no,yes,no,no
+case,Pulmonary,MR,MR,train,,,0155_0001,0092_H_PULM_H,Healthy,Human,Female,22.00,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,AS1_SU0308_prestent,0114_H_PULM_ALGS,Alagille Syndrome,Human,Female,16.83,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,AS1_SU0308_stent,0120_H_PULM_ALGS,Alagille Syndrome,Human,Female,16.83,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,AS2_SU0313_prestent,0115_H_PULM_ALGS,Alagille Syndrome,Human,Male,0.33,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,AS2_SU0313_stent,0121_H_PULM_ALGS,Alagille Syndrome,Human,Male,0.33,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,AS3_SU0238_prestent,0116_H_PULM_ALGS,Alagille Syndrome,Human,Male,13.08,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,AS3_SU0238_stent,0122_H_PULM_ALGS,Alagille Syndrome,Human,Male,13.08,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,AS4_SU0287_prestent,0117_H_PULM_ALGS,Alagille Syndrome,Human,Male,5.83,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,AS4_SU0287_stent,0123_H_PULM_ALGS,Alagille Syndrome,Human,Male,5.83,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,SU0187,0130_H_PULM_PAH,Pulmonary Arterial Hypertension,Human,Male,10.60,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,SU0197,0131_H_PULM_PAH,Pulmonary Arterial Hypertension,Human,Female,16.90,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,SU0201,0132_H_PULM_PAH,Pulmonary Arterial Hypertension,Human,Female,10.30,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,SU0208,0128_H_PULM_PAH,Pulmonary Arterial Hypertension,Human,Female,14.00,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,SU0230,0133_H_PULM_PAH,Pulmonary Arterial Hypertension,Human,Female,17.00,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,SU0232,0134_H_PULM_PAH,Pulmonary Arterial Hypertension,Human,Male,17.60,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,SU0240,0135_H_PULM_PAH,Pulmonary Arterial Hypertension,Human,Male,9.10,no,yes,no,no
+case,Pulmonary,MR,MR,train,,,SU0247,0103_H_PULM_H,Healthy,Human,Male,15.00,no,yes,no,no
+case,Pulmonary,MR,MR,train,,,SU0248,0104_H_PULM_H,Healthy,Human,Male,9.00,no,yes,no,no
+case,Pulmonary,MR,MR,train,,,SU0249,0105_H_PULM_H,Healthy,Human,Male,15.00,no,yes,no,no
+case,Pulmonary,MR,MR,train,,,SU0251,0108_H_PULM_H,Healthy,Human,Male,18.00,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,SU0261,0129_H_PULM_PAH,Pulmonary Arterial Hypertension,Human,Female,4.30,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,WS1_SU0267_stent,0124_H_PULM_WS,Williams Syndrome,Human,Male,0.58,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,WS2_SU0269_prestent,0119_H_PULM_WS,Williams Syndrome,Human,Female,0.17,no,yes,no,no
+case,Pulmonary,MR,CT_MR,train,,,WS2_SU0269_stent,0125_H_PULM_WS,Williams Syndrome,Human,Female,0.17,no,yes,no,no
+group_header,Pulmonary Fontan,CT,,,1,0,,,,,,,,,,
+case,Pulmonary Fontan,CT,CT,train,,,0065_0001,0056_H_PULMFON_TAT,Tricuspid Atresia,Human,Female,5.00,yes,no,no,no
+group_header,Pulmonary Fontan,MR,,,12,3,,,,,,,,,,
+case,Pulmonary Fontan,MR,MR,test,,,0077_0001,0059_H_PULMFON_TAT,Tricuspid Atresia,Human,Female,3.00,no,yes,no,yes
+case,Pulmonary Fontan,MR,MR,test,,,0126_0001,0065_H_PULMFON_SVD,Single Ventricle Defect,Human,Male,9.00,no,yes,no,yes
+case,Pulmonary Fontan,MR,MR,test,,,PT1_6M,0162_H_PULMFON_SVD,Single Ventricle Defect,Human,Female,3.50,no,yes,no,yes
+case,Pulmonary Fontan,MR,MR,train,,,0063_0001,0054_H_PULMFON_TAT,Tricuspid Atresia,Human,Male,3.00,no,yes,no,no
+case,Pulmonary Fontan,MR,MR,train,,,0064_0001,0055_H_PULMFON_HLHS,Hypoplastic Left Heart Syndrome,Human,Female,6.00,no,yes,no,no
+case,Pulmonary Fontan,MR,MR,train,,,0075_0001,0057_H_PULMFON_TAT,Tricuspid Atresia,Human,Female,17.00,no,yes,no,no
+case,Pulmonary Fontan,MR,MR,train,,,0076_0001,0058_H_PULMFON_PAT,Pulmonary Atresia,Human,Female,27.00,no,yes,no,no
+case,Pulmonary Fontan,MR,MR,train,,,0125_0001,0064_H_PULMFON_SVD,Single Ventricle Defect,Human,Male,5.00,no,yes,no,no
+case,Pulmonary Fontan,MR,MR,train,,,PT1_3Y,0161_H_PULMFON_SVD,Single Ventricle Defect,Human,Female,6.00,no,yes,no,no
+case,Pulmonary Fontan,MR,MR,train,,,PT2_3Y,0163_H_PULMFON_SVD,Single Ventricle Defect,Human,Male,5.00,no,yes,no,no
+case,Pulmonary Fontan,MR,MR,train,,,PT2_6M,0164_H_PULMFON_SVD,Single Ventricle Defect,Human,Male,2.50,no,yes,no,no
+case,Pulmonary Fontan,MR,MR,train,,,PT3_3Y,0165_H_PULMFON_SVD,Single Ventricle Defect,Human,Female,5.00,no,yes,no,no
+case,Pulmonary Fontan,MR,MR,train,,,PT3_6M,0166_H_PULMFON_SVD,Single Ventricle Defect,Human,Female,2.50,no,yes,no,no
+case,Pulmonary Fontan,MR,MR,train,,,PT4_3Y,0167_H_PULMFON_SVD,Single Ventricle Defect,Human,Female,5.00,no,yes,no,no
+case,Pulmonary Fontan,MR,MR,train,,,PT4_6M,0168_H_PULMFON_SVD,Single Ventricle Defect,Human,Female,2.50,no,yes,no,no
+group_header,Pulmonary Glenn,MR,,,3,1,,,,,,,,,,
+case,Pulmonary Glenn,MR,MR,test,,,0098_0001,0062_H_PULMGLN_SVD,Single Ventricle Defect,Human,Female,2.83,no,yes,no,yes
+case,Pulmonary Glenn,MR,MR,train,,,0096_0001,0060_H_PULMGLN_SVD,Single Ventricle Defect,Human,Female,3.00,no,yes,no,no
+case,Pulmonary Glenn,MR,MR,train,,,0097_0001,0061_H_PULMGLN_SVD,Single Ventricle Defect,Human,Male,3.92,no,yes,no,no
+case,Pulmonary Glenn,MR,MR,train,,,0099_0001,0063_H_PULMGLN_SVD,Single Ventricle Defect,Human,Male,4.75,no,yes,no,no
