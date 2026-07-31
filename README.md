@@ -35,14 +35,6 @@ pip install -e .
 pip install -e ".[traj]"
 ```
 
-From another project (e.g. SeqSeg):
-
-```bash
-pip install "seqseg[train]"
-# or editable local:
-pip install -e ../vascular-segment-sampler
-```
-
 Python API:
 
 ```python
