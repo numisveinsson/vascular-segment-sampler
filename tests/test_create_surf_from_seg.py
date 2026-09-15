@@ -31,7 +31,15 @@ convert_seg_to_surfs = sf.convert_seg_to_surfs
 
 # Import rotate_mesh from global (it's specific to that script)
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'global'))
-from create_surf_from_seg import rotate_mesh
+from create_surf_from_seg import (
+    rotate_mesh,
+    parse_label_names,
+    parse_mask_labels,
+    label_folder_name,
+    label_output_path,
+    unique_nonzero_labels,
+    extract_per_label_surfaces,
+)
 
 
 class TestEraseBoundary(unittest.TestCase):
@@ -383,6 +391,68 @@ class TestVTKImageResample(unittest.TestCase):
         
         with self.assertRaises(ValueError):
             vtkImageResample(img, [1.0, 1.0, 1.0], 'invalid')
+
+
+class TestPerLabelSurfaces(unittest.TestCase):
+    """Test per-label marching cubes helpers and extraction."""
+
+    def test_parse_label_names(self):
+        names = parse_label_names('1=airways,2=label2,3=arteries,4=veins')
+        self.assertEqual(names, {1: 'airways', 2: 'label2', 3: 'arteries', 4: 'veins'})
+        self.assertEqual(parse_label_names(None), {})
+        self.assertEqual(parse_label_names(''), {})
+        with self.assertRaises(ValueError):
+            parse_label_names('airways')
+
+    def test_parse_mask_labels(self):
+        self.assertIsNone(parse_mask_labels(None))
+        self.assertEqual(parse_mask_labels('1,2,3'), [1, 2, 3])
+        with self.assertRaises(ValueError):
+            parse_mask_labels('')
+
+    def test_label_output_path_with_prefix(self):
+        names = {1: 'airways', 3: 'arteries'}
+        path = label_output_path(
+            '/data/airRC_dataset', 'case0', 1, names,
+            dir_prefix='surfaces_mc', output_ext='.vtp',
+        )
+        self.assertEqual(path, '/data/airRC_dataset/surfaces_mc_airways/case0.vtp')
+        path2 = label_output_path(
+            '/data/airRC_dataset', 'case0', 3, names,
+            dir_prefix='surfaces_taubin', output_ext='.vtp',
+        )
+        self.assertEqual(path2, '/data/airRC_dataset/surfaces_taubin_arteries/case0.vtp')
+        self.assertEqual(label_folder_name(2, names), 'label2')
+
+    def test_label_output_path_without_prefix(self):
+        path = label_output_path('/tmp/out', 'case0', 1, {1: 'airways'})
+        self.assertEqual(path, '/tmp/out/case0_airways.vtp')
+
+    def test_unique_nonzero_labels(self):
+        arr = np.zeros((8, 8, 8), dtype=np.uint8)
+        arr[1:3, 1:3, 1:3] = 1
+        arr[5:7, 5:7, 5:7] = 3
+        seg = sitk.GetImageFromArray(arr)
+        self.assertEqual(unique_nonzero_labels(seg), [1, 3])
+        self.assertEqual(unique_nonzero_labels(seg, mask_labels=[3]), [3])
+        self.assertEqual(unique_nonzero_labels(seg, mask_labels=[2]), [])
+
+    def test_extract_two_label_meshes(self):
+        arr = np.zeros((24, 24, 24), dtype=np.int32)
+        arr[4:10, 4:10, 4:10] = 1
+        arr[14:20, 14:20, 14:20] = 2
+        seg = sitk.GetImageFromArray(arr)
+        seg.SetSpacing([1.0, 1.0, 1.0])
+        seg.SetOrigin([0.0, 0.0, 0.0])
+
+        surfaces = extract_per_label_surfaces(seg)
+        self.assertEqual(sorted(surfaces.keys()), [1, 2])
+        for label_id, poly in surfaces.items():
+            self.assertGreater(poly.GetNumberOfPoints(), 0, msg=f'label {label_id}')
+            self.assertGreater(poly.GetNumberOfCells(), 0, msg=f'label {label_id}')
+
+        only_one = extract_per_label_surfaces(seg, mask_labels=[2])
+        self.assertEqual(list(only_one.keys()), [2])
 
 
 if __name__ == '__main__':

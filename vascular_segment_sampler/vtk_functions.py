@@ -107,10 +107,20 @@ class ClosestPoints:
 
 
 def collect_arrays(output):
+    """Convert VTK field/point/cell data arrays to numpy.
+
+    Skip unnamed arrays and non-numeric slots (``GetArray(i)`` is None for
+    string/abstract arrays). ``vtk_to_numpy(None)`` raises
+    ``'NoneType' object has no attribute 'GetDataType'``.
+    """
     res = {}
+    if output is None:
+        return res
     for i in range(output.GetNumberOfArrays()):
         name = output.GetArrayName(i)
         data = output.GetArray(i)
+        if name is None or data is None:
+            continue
         res[name] = v2n(data)
     return res
 
@@ -1269,8 +1279,18 @@ def convertPolyDataToImageData(poly, ref_im):
     Returns:
         output: resulted vtkImageData
     """
-    ref_im.GetPointData().SetScalars(n2v(np.zeros(
-           v2n(ref_im.GetPointData().GetScalars()).shape, dtype=np.int32)))
+    sc = ref_im.GetPointData().GetScalars()
+    if sc is None:
+        dims = ref_im.GetDimensions()
+        n = int(dims[0]) * int(dims[1]) * int(dims[2])
+        if n <= 0:
+            raise RuntimeError(
+                f"VTK image has no scalars and empty dimensions {dims}"
+            )
+        shape = n
+    else:
+        shape = v2n(sc).shape
+    ref_im.GetPointData().SetScalars(n2v(np.zeros(shape, dtype=np.int32)))
     ply2im = vtk.vtkPolyDataToImageStencil()
     ply2im.SetTolerance(0.05)
     ply2im.SetInputData(poly)
@@ -1286,7 +1306,13 @@ def convertPolyDataToImageData(poly, ref_im):
     output = stencil.GetOutput()
 
     # Convert output to integer type
-    output_array = v2n(output.GetPointData().GetScalars()).astype(np.int32)
+    out_sc = output.GetPointData().GetScalars()
+    if out_sc is None:
+        raise RuntimeError(
+            "Surface-to-image stencil produced no voxel data. "
+            "Check that the surface mesh is non-empty and closed."
+        )
+    output_array = v2n(out_sc).astype(np.int32)
     output.GetPointData().SetScalars(n2v(output_array))
 
     return output

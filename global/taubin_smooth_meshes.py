@@ -13,7 +13,7 @@ if project_root not in sys.path:
 from modules import vtk_functions as vf
 
 
-def taubin_smooth_mesh(poly, iteration=25, boundary=False, feature=False, smoothing_factor=0.0):
+def taubin_smooth_mesh(poly, iteration=25, boundary=False, feature=False, smoothing_factor=0.5):
     """
     Apply Taubin smoothing to a VTK PolyData mesh.
     Uses vtkWindowedSincPolyDataFilter (implements Taubin's λ/μ algorithm).
@@ -66,8 +66,9 @@ Examples:
     parser.add_argument(
         "--smoothing_factor",
         type=float,
-        default=0.0,
-        help="Smoothing factor affecting pass band (default: 0.0)",
+        default=0.5,
+        help="Smoothing factor affecting pass band (default: 0.5 -> pass band 0.01). "
+             "Pass band = 10^(-4 * factor).",
     )
     parser.add_argument(
         "--boundary",

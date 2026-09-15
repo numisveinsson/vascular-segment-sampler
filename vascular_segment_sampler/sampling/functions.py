@@ -210,11 +210,23 @@ def sort_centerline(centerline, sub_divide=1, debug=False):
     num_points = centerline.GetNumberOfPoints()               # number of points in centerline
     cent_data = collect_arrays(centerline.GetPointData())
     c_loc = v2n(centerline.GetPoints().GetData())             # point locations as numpy array
-    try:
-        radii = cent_data['MaximumInscribedSphereRadius']   # Max Inscribed Sphere Radius as numpy array
-    except Exception as e:
-        print(e)
-        radii = cent_data['f']
+    radii = None
+    for key in (
+        "MaximumInscribedSphereRadius",
+        "Radius",
+        "radius",
+        "f",
+    ):
+        if key in cent_data:
+            radii = cent_data[key]
+            break
+    if radii is None:
+        names = [n for n in cent_data if n]
+        raise RuntimeError(
+            "Centerline has no MaximumInscribedSphereRadius (or Radius) "
+            "point-data array. Export VMTK/SimVascular centerlines. "
+            f"Found arrays: {names or '(none)'}"
+        )
     # get cent_ids, a list of lists
     # each list is the ids of the points belonging to a centerline
     try:
