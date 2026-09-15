@@ -2,7 +2,6 @@
 # This config is designed to work with tests/data/
 
 DATASET_NAME: 'other'
-IMG_EXT: '.mha'
 
 BINARIZE: True
 ANATOMY: ['Aorta']

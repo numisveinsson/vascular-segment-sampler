@@ -4,7 +4,6 @@
 
 DATASET_NAME: 'other' #'vmr' # or other 'other'
 
-IMG_EXT: '.nrrd'
 
 BINARIZE: True
 SCALED: False

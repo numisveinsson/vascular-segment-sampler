@@ -77,7 +77,6 @@ vascular-segment-sampler/
 
 The main configuration file is `config/global.yaml`. This file contains settings for:
 - `DATASET_NAME`: Name of the dataset
-- `IMG_EXT`: Image file extension
 - Various processing flags (see below)
 
 **Note:** The following parameters are now provided as command-line arguments instead of config file entries:
@@ -90,7 +89,6 @@ The main configuration file is `config/global.yaml`. This file contains settings
 ### Key Configuration Parameters
 
 - `DATASET_NAME`: Name of the dataset ('vmr' or 'other')
-- `IMG_EXT`: File extension for images (e.g., '.mha', '.vti', '.nrrd')
 - `ANATOMY`: Type of anatomy ('ALL' or specific list)
 - `EXTRACT_VOLUMES`: Extract volumes from images
 - `ROTATE_VOLUMES`: Rotate volumes during processing

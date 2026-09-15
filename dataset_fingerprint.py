@@ -83,10 +83,9 @@ def _resolve_cases_from_global_config(global_config, split_mode='full'):
 
         from dataset_dirs.datasets import get_dataset_cases
 
-        img_ext = global_config.get('IMG_EXT', '.mha')
         return set(get_dataset_cases(
             data_dir,
-            img_ext,
+            global_config.get('IMG_EXT'),
             global_config.get('TEST_CASES') or [],
             testing=(split_mode == 'test'),
         ))
@@ -112,7 +111,7 @@ def load_global_config_with_data_dir(config_path, data_dir_override):
 
 
 # Extensions used when mapping images/truths filenames to case IDs (must stay consistent).
-_VOLUME_CASE_EXTENSIONS = ('.mha', '.nii.gz', '.nii', '.nrrd', '.vti', '.vtk')
+_VOLUME_CASE_EXTENSIONS = ('.nii.gz', '.mha', '.nrrd', '.nii', '.vti', '.vtk', '.mhd')
 
 
 def _stem_case_filename(filename):
@@ -120,7 +119,7 @@ def _stem_case_filename(filename):
     name = os.path.basename(filename)
     for ext in _VOLUME_CASE_EXTENSIONS:
         if name.endswith(ext):
-            return name.replace(ext, '')
+            return name[:-len(ext)]
     return None
 
 

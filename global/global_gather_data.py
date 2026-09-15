@@ -208,7 +208,7 @@ if __name__ == '__main__':
         for i, case_fn in enumerate(cases):
 
             # Load data
-            case_dict = get_case_dict_dir(global_config['DATA_DIR'], case_fn, global_config['IMG_EXT'])
+            case_dict = get_case_dict_dir(global_config['DATA_DIR'], case_fn, global_config.get('IMG_EXT'))
             print(f"\n {i+1}/{len(cases)}: {case_dict['NAME']}")
 
             name = case_dict['NAME']

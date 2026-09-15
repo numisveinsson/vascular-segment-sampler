@@ -30,8 +30,6 @@ OUT_DIR = ROOT / "config" / "vmr_splits"
 
 RNG_SEED = 42
 TEST_FRAC = 0.2
-# VMR volumes on disk use this extension (not the default in config/global.yaml).
-VMR_IMG_EXT = ".mha"
 VMR_RADIUS_ADD = 0.01
 VMR_RADIUS_SCALE = 1
 
@@ -165,15 +163,14 @@ def yaml_quote_list(items: List[str], indent: int = 2) -> str:
 
 
 def global_yaml_middle() -> str:
-    """Settings from config/global.yaml (IMG_EXT … MOVE_SLOWER_BIFURC); omits ANATOMY (set per cohort header)."""
+    """Settings from config/global.yaml (BINARIZE … MOVE_SLOWER_BIFURC); omits ANATOMY (set per cohort header)."""
     text = GLOBAL_YAML.read_text(encoding="utf-8")
     lines = text.splitlines()
     out = []
     capture = False
     for line in lines:
-        if line.startswith("IMG_EXT:"):
+        if line.startswith("BINARIZE:"):
             capture = True
-            continue
         if not capture:
             continue
         if line.startswith("ANATOMY:"):
@@ -229,8 +226,6 @@ DATASET_NAME: 'vmr'
 
 MODALITY: [{mod_inner}]
 {vmr_line}ANATOMY: [{anatomy_inner}]
-
-IMG_EXT: '{VMR_IMG_EXT}'
 
 """
     middle = apply_vmr_radius_overrides(global_yaml_middle())

@@ -92,7 +92,7 @@ def list_samples_cases(directory):
     return samples_cases, cases
 
 
-def create_mask_case(case, dir_global, rad_prop=5, img_ext='.mha'):
+def create_mask_case(case, dir_global, rad_prop=5, img_ext=None):
 
     dir_image, dir_seg, dir_cent, dir_surf = directories(dir_global, case, img_ext=img_ext)
     reader_im, origin_im, size_im, spacing_im = import_image(dir_image)
@@ -156,7 +156,7 @@ if __name__=='__main__':
 
             print('\nNext case: ', case)
 
-            mask = create_mask_case(case, input_dir_global, rad_prop, img_ext=global_config['IMG_EXT'])
+            mask = create_mask_case(case, input_dir_global, rad_prop, img_ext=global_config.get('IMG_EXT'))
 
             # samples = samples_cases[case]
             # # only keep samples that have been '_0'

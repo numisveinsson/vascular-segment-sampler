@@ -10,7 +10,6 @@ DATASET_NAME: 'vmr'
 MODALITY: ['CT']
 ANATOMY: ['Aorta', 'Abdominal Aorta', 'Coronary', 'Cerebral', 'Pulmonary', 'Pulmonary Fontan', 'Pulmonary Glenn']
 
-IMG_EXT: '.mha'
 
 
 BINARIZE: True

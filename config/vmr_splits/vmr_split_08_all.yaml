@@ -11,7 +11,6 @@ MODALITY: ['CT', 'MR']
 VMR_IMAGE_MODALITIES: ['CT', 'MR', 'CT_MR']
 ANATOMY: ['Aorta', 'Abdominal Aorta', 'Coronary', 'Cerebral', 'Pulmonary', 'Pulmonary Fontan', 'Pulmonary Glenn']
 
-IMG_EXT: '.mha'
 
 
 BINARIZE: True

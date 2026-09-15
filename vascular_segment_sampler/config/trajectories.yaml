@@ -5,7 +5,6 @@
 
 DATASET_NAME: 'vmr' #'vmr' # or other 'other'
 
-IMG_EXT: '.mha'
 
 BINARIZE: False
 ANATOMY: ['Aorta'] # can be 'ALL' or ['Aorta', 'Abdominal Aorta', 'Pulmonary', 'Coronary', 'CHD', 'Cerebro']

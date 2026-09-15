@@ -10,7 +10,6 @@ DATASET_NAME: 'vmr'
 MODALITY: ['CT']
 ANATOMY: ['Coronary']
 
-IMG_EXT: '.mha'
 
 
 BINARIZE: True

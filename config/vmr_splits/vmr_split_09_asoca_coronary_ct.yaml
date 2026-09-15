@@ -11,7 +11,6 @@ MODALITY: ['CT']
 VMR_IMAGE_MODALITIES: ['CT']
 ANATOMY: ['Coronary']
 
-IMG_EXT: '.mha'
 
 
 BINARIZE: True

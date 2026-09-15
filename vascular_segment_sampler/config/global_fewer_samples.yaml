@@ -2,7 +2,6 @@
 
 DATASET_NAME: 'vmr' #'vmr' # or other 'other'
 
-IMG_EXT: '.mha' #'.nii.gz' #'.mha' #'.nii.gz' #'.mha' #'.nii.gz' # Image file extension
 
 BINARIZE: True # Need true for VMR since 255 labels
 ANATOMY: ['Aorta', 'Abdominal Aorta'] # can be 'ALL' or ['Aorta', 'Abdominal Aorta', 'Pulmonary', 'Coronary', 'CHD', 'Cerebro']

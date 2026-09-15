@@ -11,7 +11,6 @@ MODALITY: ['MR']
 VMR_IMAGE_MODALITIES: ['CT', 'MR']
 ANATOMY: ['Pulmonary Fontan']
 
-IMG_EXT: '.mha'
 
 
 BINARIZE: True

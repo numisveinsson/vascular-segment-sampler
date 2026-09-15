@@ -135,7 +135,7 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
 
     # Load data
     case_dict = get_case_dict_dir(global_config['DATA_DIR'], case_fn,
-                                  global_config['IMG_EXT'])
+                                  global_config.get('IMG_EXT'))
 
     # Print case name and core label
     print(f"\n I am process {multiprocessing.current_process().name}")

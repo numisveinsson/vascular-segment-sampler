@@ -2,6 +2,37 @@ import os
 
 import pandas as pd
 
+# Longest-first so .nii.gz is matched before .nii.
+IMAGE_EXTS = ('.nii.gz', '.mha', '.nrrd', '.nii', '.vti', '.vtk', '.mhd')
+
+
+def _case_id_from_volume_filename(filename, img_ext=None):
+    """Return case id by stripping a known (or given) volume suffix, else None."""
+    name = os.path.basename(filename)
+    if name.startswith('.'):
+        return None
+    suffixes = (img_ext,) if img_ext else IMAGE_EXTS
+    for ext in sorted(suffixes, key=len, reverse=True):
+        if ext and name.endswith(ext):
+            return name[:-len(ext)]
+    return None
+
+
+def _resolve_volume_path(directory, subdir, model, img_ext=None):
+    """Path to images/truths file for a case; probe known suffixes if img_ext is omitted."""
+    folder = os.path.join(directory, subdir)
+    if img_ext:
+        return os.path.join(folder, model + img_ext)
+    for ext in IMAGE_EXTS:
+        path = os.path.join(folder, model + ext)
+        if os.path.isfile(path):
+            return path
+    sibling = 'truths' if subdir == 'images' else 'images'
+    for ext in IMAGE_EXTS:
+        if os.path.isfile(os.path.join(directory, sibling, model + ext)):
+            return os.path.join(folder, model + ext)
+    return os.path.join(folder, model + '.mha')
+
 
 def create_dataset(global_config, modality):
 
@@ -23,7 +54,12 @@ def create_dataset(global_config, modality):
         cases = Dataset.check_which_cases_in_image_dir(cases)
         cases = [f for f in cases if f not in global_config['BAD_CASES']]
     elif dataset_name == 'other':
-        cases = get_dataset_cases(global_config['DATA_DIR'], global_config['IMG_EXT'], global_config['TEST_CASES'], global_config['TESTING'])
+        cases = get_dataset_cases(
+            global_config['DATA_DIR'],
+            global_config.get('IMG_EXT'),
+            global_config['TEST_CASES'],
+            global_config['TESTING'],
+        )
     else:
         print("Dataset not found")
         exit()
@@ -31,21 +67,28 @@ def create_dataset(global_config, modality):
     return cases
 
 
-def get_dataset_cases(directory, img_ext, test_cases, testing=False):
+def get_dataset_cases(directory, img_ext=None, test_cases=None, testing=False):
 
     """
     Returns a list of cases in the dataset
     Input: 
         directory (str)
-        img_ext (str)
+        img_ext (str or None): optional suffix filter; if omitted, any IMAGE_EXTS
         test_cases (list of str)
     Output: cases (list of str)
     """
+    if test_cases is None:
+        test_cases = []
     directory = os.path.abspath(os.path.expanduser(directory))
-    cases_im = os.listdir(os.path.join(directory, 'images'))
-    cases_im = [f for f in cases_im if f.endswith(img_ext)]
-    cases_im = [f.replace(img_ext, '') for f in cases_im]
-    print(f"Found {len(cases_im)} images with extension {img_ext}")
+    cases_im = []
+    for f in os.listdir(os.path.join(directory, 'images')):
+        cid = _case_id_from_volume_filename(f, img_ext)
+        if cid is not None:
+            cases_im.append(cid)
+    if img_ext:
+        print(f"Found {len(cases_im)} images with extension {img_ext}")
+    else:
+        print(f"Found {len(cases_im)} images")
 
     cases_cent = os.listdir(os.path.join(directory, 'centerlines'))
     cases_cent = [f for f in cases_cent if f.endswith('.vtp')]
@@ -142,15 +185,12 @@ class VMR_dataset:
         Check which cases are in the data directory (Images)
         """
         img_dir = os.path.join(self.dir, 'images')
-        images = os.listdir(img_dir)
-        # ignore hidden files
-        images = [f for f in images if f[0] != '.']
-        # remove the file extension
-        images = [f.split('.')[0] for f in images]
-        # remove duplicates
-        images = list(set(images))
-        # sort
-        images.sort()
+        images = []
+        for f in os.listdir(img_dir):
+            cid = _case_id_from_volume_filename(f)
+            if cid is not None:
+                images.append(cid)
+        images = sorted(set(images))
 
         cases = [f for f in cases_list if f in images]
 
@@ -167,15 +207,12 @@ class VMR_dataset:
         Check which cases are in the data directory (Images)
         """
         img_dir = os.path.join(self.dir, 'images')
-        images = os.listdir(img_dir)
-        # ignore hidden files
-        images = [f for f in images if f[0] != '.']
-        # remove the file extension
-        images = [f.split('.')[0] for f in images]
-        # remove duplicates
-        images = list(set(images))
-        # sort
-        images.sort()
+        images = []
+        for f in os.listdir(img_dir):
+            cid = _case_id_from_volume_filename(f)
+            if cid is not None:
+                images.append(cid)
+        images = sorted(set(images))
 
         self.image_cases = images
 
@@ -210,13 +247,13 @@ def resolve_case_surface_path(directory, model):
     return None
 
 
-def get_case_dict_dir(directory, model, img_ext):
+def get_case_dict_dir(directory, model, img_ext=None):
     """
     Get the directories of the case
     Input: model (str)
     Output: dict of directories
     """
-    dir_image, dir_seg, dir_cent, dir_surf = directories( directory, model, img_ext)
+    dir_image, dir_seg, dir_cent, dir_surf = directories(directory, model, img_ext)
     dir_dict = {'NAME': model,
                 'IMAGE': dir_image,
                 'SEGMENTATION': dir_seg,
@@ -296,7 +333,7 @@ def get_vmr_names_disease(df, image_mod):
     """
     return df[df['Image Modality'].isin(image_mod)]
 
-def directories(directory, model, img_ext):
+def directories(directory, model, img_ext=None):
     """
     Function to return the directories of
         Image Volume
@@ -305,8 +342,8 @@ def directories(directory, model, img_ext):
         Surface Mesh VTP
     """
     directory = os.path.abspath(os.path.expanduser(directory))
-    dir_image = os.path.join(directory, 'images', model + img_ext)
-    dir_seg = os.path.join(directory, 'truths', model + img_ext)
+    dir_image = _resolve_volume_path(directory, 'images', model, img_ext)
+    dir_seg = _resolve_volume_path(directory, 'truths', model, img_ext)
     dir_cent = os.path.join(directory, 'centerlines', model + '.vtp')
     dir_surf = os.path.join(directory, 'surfaces', model + '.vtp')
 
