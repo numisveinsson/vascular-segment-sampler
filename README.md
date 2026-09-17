@@ -38,14 +38,17 @@ pip install -e ".[traj]"
 Python API:
 
 ```python
-from vascular_segment_sampler.sampling import extract_patches
+from vascular_segment_sampler.sampling import extract_patches, gather_global_volumes
 from vascular_segment_sampler.nnunet import write_nnunet_dataset
 
-extract_patches(data_dir=..., outdir=..., config="global")
+extract_patches(data_dir=..., outdir=..., config="default_mm")
+gather_global_volumes(data_dir=..., outdir=..., config="global")
 write_nnunet_dataset(indir=..., name="MYDATA", dataset_number=999, modality="ct")
 ```
 
-Console scripts: `vss-sample`, `vss-to-nnunet`.
+Console scripts: `vss-sample`, `vss-gather-global`, `vss-to-nnunet`.
+
+`gather_global_volumes` is the whole-image counterpart of `extract_patches`: same case listing (`images/`, `truths/`, `centerlines/`), one volume per case under `{modality}_train` / `{modality}_train_masks`. Pass `convert_nnunet=True` (or run `vss-to-nnunet` afterward) to write an nnU-Net `DatasetXXX_*` folder.
 
 ### Conda
 
@@ -60,11 +63,11 @@ pip install -e .
 ```
 vascular-segment-sampler/
 ├── vascular_segment_sampler/  # Installable package
-│   ├── sampling/              # extract_patches
+│   ├── sampling/              # extract_patches, gather_global_volumes
 │   ├── nnunet/                # write_nnunet_dataset
 │   ├── preprocessing/
-│   └── config/
-├── config/                    # YAML configs (also packaged)
+│   └── config/                # Packaged library defaults
+├── config/                    # Experiment overlay YAMLs
 ├── modules/                   # Legacy shims → vascular_segment_sampler
 ├── preprocessing/             # Standalone preprocessing scripts
 ├── global/                    # Global processing scripts
@@ -75,7 +78,15 @@ vascular-segment-sampler/
 
 ## Configuration
 
-The main configuration file is `config/global.yaml`. This file contains settings for:
+Library defaults ship in `vascular_segment_sampler/config/` and are installed with the package:
+
+- `default_mm.yaml` — DICOM-style millimeters (the merge base)
+- `default_cm.yaml` — VMR / SimVascular centimeters
+- `default_mm_coronary.yaml` — millimeters with a larger `RADIUS_ADD` for coronary
+
+Repo-root `config/` holds experiment overlays (`global.yaml`, VMR splits, and so on). Named configs overlay `default_mm` at load time. Sampling knobs `MOVE_DIST` / `MU_SIZE` are radius-relative (same for aorta and coronary). Absolute keys `RADIUS_ADD` and `LARGE_RADIUS_THRESH` differ by unit.
+
+These files contain settings for:
 - `DATASET_NAME`: Name of the dataset
 - Various processing flags (see below)
 
@@ -114,7 +125,7 @@ Main script for parallel processing of data sampling from multiple cases. Uses m
 **Usage:**
 ```bash
 python3 main.py \
-    --config_name global \
+    --config_name default_mm \
     --data_dir /path/to/data \
     --outdir ./extracted_data/ \
     --num_cores 4 \
@@ -122,11 +133,10 @@ python3 main.py \
 ```
 
 **Required Arguments:**
-- `--config_name` / `-config_name`: Name of configuration file (without .yaml extension)
-  - Example: `--config_name global` uses `config/global.yaml`
 - `--data_dir` / `-data_dir`: Directory where input data is stored
 
 **Optional Arguments:**
+- `--config_name` / `-config_name`: Packaged default (`default_mm`, `default_cm`, `default_mm_coronary`), a YAML name under `config/`, or a path. Defaults to `default_mm` (millimeters). Use `default_cm` for VMR/SimVascular centimeters.
 - `--outdir` / `-outdir`: Output directory for extracted data (default: `./extracted_data/`)
 - `--perc_dataset` / `-perc_dataset`: Percentage of dataset to use, 0.0 to 1.0 (default: `1.0`)
 - `--num_cores` / `-num_cores`: Number of CPU cores to use for parallel processing (default: `1`)
@@ -139,29 +149,50 @@ python3 main.py \
 
 **Examples:**
 ```bash
-# Process all cases with 4 cores
-python3 main.py --config_name global --data_dir /path/to/data --num_cores 4
+# Millimeter data (DICOM; this is the default)
+python3 main.py --config_name default_mm --data_dir /path/to/data --num_cores 4
+
+# Centimeter data (VMR)
+python3 main.py --config_name default_cm --data_dir /path/to/data --num_cores 4
 
 # Process 50% of dataset with 8 cores
-python3 main.py --config_name global --data_dir /path/to/data --perc_dataset 0.5 --num_cores 8
+python3 main.py --config_name default_mm --data_dir /path/to/data --perc_dataset 0.5 --num_cores 8
 
 # Process cases 10 to 20
-python3 main.py --config_name global --data_dir /path/to/data --start_from 10 --end_at 20
+python3 main.py --config_name default_mm --data_dir /path/to/data --start_from 10 --end_at 20
 
 # Custom output directory
-python3 main.py --config_name global --data_dir /path/to/data --outdir /path/to/output
+python3 main.py --config_name default_mm --data_dir /path/to/data --outdir /path/to/output
 
 # Enable testing mode and limit samples for quick test
-python3 main.py --config_name global --data_dir /path/to/data --testing --max_samples 100
+python3 main.py --config_name default_mm --data_dir /path/to/data --testing --max_samples 100
 
 # Process only CT modality with custom validation split
-python3 main.py --config_name global --data_dir /path/to/data --modality CT --validation_prop 0.15
+python3 main.py --config_name default_mm --data_dir /path/to/data --modality CT --validation_prop 0.15
 
 # Process both CT and MR modalities
-python3 main.py --config_name global --data_dir /path/to/data --modality CT,MR
+python3 main.py --config_name default_mm --data_dir /path/to/data --modality CT,MR
 ```
 
-The script uses configuration from the specified YAML file in `config/` and processes cases in the dataset according to the provided arguments.
+The script uses the specified config (packaged library default or a YAML overlay under `config/`) and processes cases in the dataset according to the provided arguments.
+
+### Whole-image nnU-Net datasets
+
+`vss-gather-global` (Python: `gather_global_volumes`) copies each case's full image and label instead of sampled patches, then can convert with `--convert_nnunet`:
+
+```bash
+vss-gather-global \
+    --data_dir /path/to/data \
+    --outdir ./global_data/ \
+    --config_name global \
+    --modality CT \
+    --convert_nnunet \
+    --nnunet_name MYDATA \
+    --nnunet_dataset_number 999 \
+    --yes
+```
+
+`python3 global/global_gather_data.py` is a shim for the same CLI. Case listing matches `extract_patches` (`DATASET_NAME: other` still requires a centerline `.vtp` per training case).
 
 ## Preprocessing Scripts
 

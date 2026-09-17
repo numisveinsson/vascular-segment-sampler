@@ -582,40 +582,18 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
 
 
 def _load_config(config):
-    """Accept a config dict or a path/name of a YAML file."""
-    if isinstance(config, dict):
-        return dict(config)
+    """Accept a config dict or a path/name of a YAML file.
 
-    config_path = str(config)
-    # Bare names like "global" must not match the repo's global/ directory.
-    if os.path.isfile(config_path):
-        return io.load_yaml(config_path)
-
-    candidate = config_path if config_path.endswith(".yaml") else config_path + ".yaml"
-    basename = os.path.basename(candidate)
-    pkg_cfg = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "config",
-        basename,
-    )
-    cwd_cfg = os.path.join("config", basename)
-
-    if os.path.isfile(cwd_cfg):
-        config_path = cwd_cfg
-    elif os.path.isfile(pkg_cfg):
-        config_path = pkg_cfg
-    elif os.path.isfile(candidate):
-        config_path = candidate
-    else:
-        config_path = cwd_cfg if os.path.isdir("config") else pkg_cfg
-
-    return io.load_yaml(config_path)
+    Named configs overlay packaged ``default_mm.yaml``. Bare names like ``default_mm``
+    must not match the repo's ``global/`` directory.
+    """
+    return io.load_config(config)
 
 
 def extract_patches(
     data_dir,
     outdir="./extracted_data/",
-    config="global",
+    config="default_mm",
     *,
     perc_dataset=1.0,
     num_cores=1,
@@ -642,8 +620,8 @@ def extract_patches(
     outdir : str
         Output directory for extracted samples.
     config : dict | str
-        Config dict or path/name of a YAML config (e.g. ``"global"`` or
-        ``"config/global.yaml"``).
+        Config dict or path/name of a YAML config (e.g. ``"default_mm"`` or
+        ``"config/global.yaml"``). Overlay on packaged ``default_mm.yaml``.
     """
     global_config = _load_config(config)
     global_config["DATA_DIR"] = data_dir
@@ -671,6 +649,9 @@ def extract_patches(
 
     if "MIN_DIM" not in global_config:
         global_config["MIN_DIM"] = 5
+
+    if "LARGE_RADIUS_THRESH" not in global_config:
+        global_config["LARGE_RADIUS_THRESH"] = 4.0
 
     output_suffix = output_suffix or ""
     global_config["OUTPUT_SUFFIX"] = output_suffix

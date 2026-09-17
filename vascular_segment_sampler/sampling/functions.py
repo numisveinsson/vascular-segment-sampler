@@ -1786,7 +1786,8 @@ def find_next_point(count, locs, rads, bifurc, global_config, on_cent):
         on_cent = False
         return count, on_cent
     move_distance = global_config['MOVE_DIST']*rads[count]
-    if rads[count] >= 0.4:  # Move slower for larger vessels
+    large_r = global_config.get('LARGE_RADIUS_THRESH', 4.0)
+    if rads[count] >= large_r:  # Move slower for larger vessels
         move_distance = move_distance * global_config['MOVE_SLOWER_LARGE']
         # print("slowerrrrr")
     if bifurc[count] == 2:  # Move slower for bifurcating vessels

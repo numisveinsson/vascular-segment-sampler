@@ -1,5 +1,67 @@
+import os
 import yaml
 import csv
+
+_PKG_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_CONFIG_NAME = "default_mm"
+
+
+def resolve_config_path(config):
+    """Resolve a config name or path to a YAML file.
+
+    Bare names look in ``./config/`` (experiment overlays) then the packaged
+    ``vascular_segment_sampler/config/`` (library defaults: ``default_mm``,
+    ``default_cm``, ``default_mm_coronary``). Existing file paths are used as-is.
+    """
+    config_path = str(config)
+    if os.path.isfile(config_path):
+        return config_path
+
+    candidate = config_path if config_path.endswith(".yaml") else config_path + ".yaml"
+    basename = os.path.basename(candidate)
+    cwd_cfg = os.path.join("config", basename)
+    pkg_cfg = os.path.join(_PKG_DIR, "config", basename)
+
+    if os.path.isfile(cwd_cfg):
+        return cwd_cfg
+    if os.path.isfile(pkg_cfg):
+        return pkg_cfg
+    if os.path.isfile(candidate):
+        return candidate
+    return cwd_cfg if os.path.isdir("config") else pkg_cfg
+
+
+def load_default_config():
+    """Load packaged ``default_mm.yaml``, or ``{}`` if it is missing."""
+    path = resolve_config_path(DEFAULT_CONFIG_NAME)
+    if not os.path.isfile(path):
+        return {}
+    loaded = load_yaml(path)
+    return dict(loaded) if loaded else {}
+
+
+def load_config(config):
+    """Load a YAML config, overlaying it on packaged ``default_mm.yaml``.
+
+    ``config`` may be a dict, a file path, or a bare name (repo-root ``config/``
+    overlay or packaged library default). List values (e.g. ``ANATOMY``,
+    ``TEST_CASES``) are replaced, not merged.
+    """
+    if isinstance(config, dict):
+        overlay = dict(config)
+    else:
+        default_path = os.path.abspath(resolve_config_path(DEFAULT_CONFIG_NAME))
+        config_path = resolve_config_path(config)
+        overlay = load_yaml(config_path)
+        if overlay is None:
+            overlay = {}
+        else:
+            overlay = dict(overlay)
+        if os.path.isfile(default_path) and os.path.abspath(config_path) == default_path:
+            return overlay
+
+    defaults = load_default_config()
+    return {**defaults, **overlay}
 
 
 def prompt_continue(message="Wish to continue? [y/n]: "):

@@ -25,13 +25,11 @@ from typing import Callable, Dict, List, Optional, Set, Tuple
 
 ROOT = Path(__file__).resolve().parents[1]
 CSV_PATH = ROOT / "dataset_dirs" / "VMR_dataset_names.csv"
-GLOBAL_YAML = ROOT / "config" / "global.yaml"
+DEFAULT_YAML = ROOT / "vascular_segment_sampler" / "config" / "default_cm.yaml"
 OUT_DIR = ROOT / "config" / "vmr_splits"
 
 RNG_SEED = 42
 TEST_FRAC = 0.2
-VMR_RADIUS_ADD = 0.01
-VMR_RADIUS_SCALE = 1
 
 ALL_ANATOMIES = [
     "Aorta",
@@ -163,8 +161,8 @@ def yaml_quote_list(items: List[str], indent: int = 2) -> str:
 
 
 def global_yaml_middle() -> str:
-    """Settings from config/global.yaml (BINARIZE … MOVE_SLOWER_BIFURC); omits ANATOMY (set per cohort header)."""
-    text = GLOBAL_YAML.read_text(encoding="utf-8")
+    """Settings from packaged default_cm.yaml (BINARIZE … MOVE_SLOWER_BIFURC); omits ANATOMY (set per cohort header)."""
+    text = DEFAULT_YAML.read_text(encoding="utf-8")
     lines = text.splitlines()
     out = []
     capture = False
@@ -179,19 +177,6 @@ def global_yaml_middle() -> str:
         if line.startswith("MOVE_SLOWER_BIFURC:"):
             break
     return "\n".join(out) + "\n"
-
-
-def apply_vmr_radius_overrides(block: str) -> str:
-    """Override RADIUS_* copied from global.yaml for all VMR split configs."""
-    lines_out: List[str] = []
-    for line in block.splitlines():
-        if line.startswith("RADIUS_ADD:"):
-            lines_out.append(f"RADIUS_ADD: {VMR_RADIUS_ADD}")
-        elif line.startswith("RADIUS_SCALE:"):
-            lines_out.append(f"RADIUS_SCALE: {VMR_RADIUS_SCALE}")
-        else:
-            lines_out.append(line)
-    return "\n".join(lines_out) + "\n"
 
 
 def write_config(
@@ -228,7 +213,7 @@ MODALITY: [{mod_inner}]
 {vmr_line}ANATOMY: [{anatomy_inner}]
 
 """
-    middle = apply_vmr_radius_overrides(global_yaml_middle())
+    middle = global_yaml_middle()
     test_block = (
         "# Held-out test cases (Legacy Name); excluded from training when TESTING is false.\n"
         "TEST_CASES:\n"
