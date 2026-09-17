@@ -653,6 +653,9 @@ def extract_patches(
     if "LARGE_RADIUS_THRESH" not in global_config:
         global_config["LARGE_RADIUS_THRESH"] = 4.0
 
+    global_config["TEST_CASES"] = global_config.get("TEST_CASES") or []
+    global_config["BAD_CASES"] = global_config.get("BAD_CASES") or []
+
     output_suffix = output_suffix or ""
     global_config["OUTPUT_SUFFIX"] = output_suffix
     global_config["SEG_FROM_SURFACE"] = bool(truth_from_surface)

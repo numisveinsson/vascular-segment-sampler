@@ -4,6 +4,16 @@ import csv
 
 _PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CONFIG_NAME = "default_mm"
+# YAML `KEY:` with no value loads as None; treat these as empty lists.
+_EMPTY_LIST_KEYS = ("TEST_CASES", "BAD_CASES")
+
+
+def _coerce_empty_lists(cfg):
+    """Replace null list-valued keys with ``[]`` so callers can use ``len()`` / ``in``."""
+    for key in _EMPTY_LIST_KEYS:
+        if cfg.get(key) is None:
+            cfg[key] = []
+    return cfg
 
 
 def resolve_config_path(config):
@@ -37,7 +47,7 @@ def load_default_config():
     if not os.path.isfile(path):
         return {}
     loaded = load_yaml(path)
-    return dict(loaded) if loaded else {}
+    return _coerce_empty_lists(dict(loaded) if loaded else {})
 
 
 def load_config(config):
@@ -58,10 +68,10 @@ def load_config(config):
         else:
             overlay = dict(overlay)
         if os.path.isfile(default_path) and os.path.abspath(config_path) == default_path:
-            return overlay
+            return _coerce_empty_lists(overlay)
 
     defaults = load_default_config()
-    return {**defaults, **overlay}
+    return _coerce_empty_lists({**defaults, **overlay})
 
 
 def prompt_continue(message="Wish to continue? [y/n]: "):

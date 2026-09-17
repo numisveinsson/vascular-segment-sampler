@@ -207,8 +207,8 @@ def gather_global_volumes(
         global_config["WRITE_VTK"] = False
     if "BINARIZE" not in global_config:
         global_config["BINARIZE"] = True
-    if "TEST_CASES" not in global_config:
-        global_config["TEST_CASES"] = []
+    global_config["TEST_CASES"] = global_config.get("TEST_CASES") or []
+    global_config["BAD_CASES"] = global_config.get("BAD_CASES") or []
 
     if global_config["WRITE_SAMPLES"]:
         global_config["WRITE_IMG"] = True

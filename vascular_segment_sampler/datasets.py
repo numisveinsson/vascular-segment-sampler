@@ -42,6 +42,9 @@ def create_dataset(global_config, modality):
     print(f'Dataset name: {dataset_name}')
     print(f'Subfolders need to be:\n images\n truths\n surfaces\n centerlines')
 
+    test_cases = global_config.get('TEST_CASES') or []
+    bad_cases = global_config.get('BAD_CASES') or []
+
     if dataset_name == 'vmr':
         img_mods = global_config.get('VMR_IMAGE_MODALITIES')
         Dataset = VMR_dataset(
@@ -50,14 +53,14 @@ def create_dataset(global_config, modality):
             global_config['ANATOMY'],
             image_modalities=img_mods,
         )
-        cases = Dataset.sort_cases(global_config['TESTING'], global_config['TEST_CASES'])
+        cases = Dataset.sort_cases(global_config['TESTING'], test_cases)
         cases = Dataset.check_which_cases_in_image_dir(cases)
-        cases = [f for f in cases if f not in global_config['BAD_CASES']]
+        cases = [f for f in cases if f not in bad_cases]
     elif dataset_name == 'other':
         cases = get_dataset_cases(
             global_config['DATA_DIR'],
             global_config.get('IMG_EXT'),
-            global_config['TEST_CASES'],
+            test_cases,
             global_config['TESTING'],
         )
     else:

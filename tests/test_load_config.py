@@ -67,6 +67,34 @@ class TestLoadConfig(unittest.TestCase):
         self.assertEqual(cfg["RADIUS_ADD"], 0.1)
         self.assertEqual(cfg["MOVE_DIST"], 1.5)
 
+    def test_empty_yaml_list_keys_become_lists(self):
+        cfg = load_config("default_mm")
+        self.assertEqual(cfg["TEST_CASES"], [])
+        self.assertEqual(cfg["BAD_CASES"], [])
+
+    def test_null_overlay_list_keys_become_lists(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
+            fh.write("TEST_CASES:\nBAD_CASES:\n")
+            path = fh.name
+        try:
+            cfg = load_config(path)
+            self.assertEqual(cfg["TEST_CASES"], [])
+            self.assertEqual(cfg["BAD_CASES"], [])
+        finally:
+            os.unlink(path)
+
+    def test_print_info_file_accepts_null_test_cases(self):
+        from vascular_segment_sampler.sampling.functions import print_info_file
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out_dir = tmp if tmp.endswith(os.sep) else tmp + os.sep
+            cfg = {"TESTING": False, "OUT_DIR": out_dir}
+            print_info_file(cfg, ["case_a"], None, "info.txt")
+            with open(os.path.join(tmp, "info.txt")) as fh:
+                text = fh.read()
+            self.assertIn("Testing models not included:", text)
+            self.assertIn("Number of training models: 1", text)
+
     def test_file_overlay_inherits_missing_keys(self):
         defaults = load_default_config()
         with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:

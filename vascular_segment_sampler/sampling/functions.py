@@ -20,6 +20,8 @@ random.seed(0)
 
 
 def print_info_file(global_config, cases, testing_samples, info_file_name):
+    testing_samples = testing_samples or []
+    cases = cases or []
 
     if not global_config['TESTING']:
         f = open(global_config['OUT_DIR'] + info_file_name, "w+")
@@ -738,10 +740,10 @@ def define_cases(global_config, modality):
     cases_raw = os.listdir(cases_dir)
     cases = [cases_dir+'/'+f for f in cases_raw if 'case.' in f]
 
-    testing_cases_raw = global_config['TEST_CASES']
+    testing_cases_raw = global_config.get('TEST_CASES') or []
     testing_samples = ['./cases'+'_'+modality+'/case.' + i + '.yml' for i in testing_cases_raw]
 
-    bad_cases_raw = global_config['BAD_CASES']
+    bad_cases_raw = global_config.get('BAD_CASES') or []
     bad_cases = ['./cases'+'_'+modality+'/case.' + i + '.yml' for i in bad_cases_raw]
 
     for case in bad_cases:

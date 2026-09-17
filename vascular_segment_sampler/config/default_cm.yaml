@@ -68,7 +68,7 @@ NUMBER_SAMPLES_START: 3 # how many samples to take at start of vessel (first 5%)
 MOVE_SLOWER_BIFURC: 0.5 # how much slower at bifurcations
 
 # Which cases to use for testing
-TEST_CASES:
+TEST_CASES: []
 
 # Which cases not to use in extraction
-BAD_CASES:
+BAD_CASES: []
