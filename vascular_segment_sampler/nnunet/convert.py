@@ -41,6 +41,52 @@ def save_json(data, filename: str) -> None:
         json.dump(data, f, indent=4)
 
 
+def _copy_matched_pairs(
+    images_dir: str,
+    labels_dir: str,
+    images_rel: str,
+    labels_rel: str,
+    out_data_dir: str,
+    images_out: str,
+    labels_out: str,
+    append: str,
+    start_from: int,
+):
+    """Copy image/label pairs matched by basename into nnU-Net folders.
+
+    Images without a matching label are skipped with a warning so later pairs
+    keep the same case index. Returns ``(name_mappings, copy_count, file_ending)``.
+    """
+    all_files = os.listdir(images_dir)
+    imgs, file_ending = _filter_by_extensions(all_files)
+    imgs.sort()
+
+    name_mappings = []
+    copy_count = 0
+    for img in imgs:
+        ext = _get_extension(img)
+        base = _get_base_name(img)
+        label_name = base + ext
+        label_path = os.path.join(labels_dir, label_name)
+        if not os.path.exists(label_path):
+            print(f"Warning: no matching label for {img}, skipping")
+            continue
+        copy_count += 1
+        idx = copy_count + start_from
+        img_new = f"{append}_{idx:03d}_0000{ext}"
+        label_new = f"{append}_{idx:03d}{ext}"
+        name_mappings.append((f"{images_out}/{img_new}", f"{images_rel}/{img}"))
+        name_mappings.append((f"{labels_out}/{label_new}", f"{labels_rel}/{label_name}"))
+        print(f"Copying {img} to {img_new}")
+        shutil.copy(
+            os.path.join(images_dir, img),
+            os.path.join(out_data_dir, images_out, img_new),
+        )
+        print(f"Copying {label_name} to {label_new}")
+        shutil.copy(label_path, os.path.join(out_data_dir, labels_out, label_new))
+    return name_mappings, copy_count, file_ending
+
+
 def write_nnunet_dataset(
     indir: str,
     name: str,
@@ -64,12 +110,7 @@ def write_nnunet_dataset(
     directory_out = outdir if outdir is not None else indir
     modality = modality.lower()
 
-    if dataset_number < 10:
-        dataset_number_str = "0" + str(dataset_number)
-    else:
-        dataset_number_str = str(dataset_number)
-
-    new_dir_dataset_name = "Dataset0" + dataset_number_str + "_" + name + modality.upper()
+    new_dir_dataset_name = f"Dataset{dataset_number:03d}_{name}{modality.upper()}"
     append = name.lower() + modality.lower()
     out_data_dir = os.path.join(directory_out, new_dir_dataset_name)
 
@@ -118,61 +159,49 @@ def write_nnunet_dataset(
     num_training = 0
 
     if input_format == "modality":
-        for fn in fns_in:
-            if not os.path.exists(os.path.join(directory, fn)):
-                print(f"{fn} does not exist")
-                continue
-            all_files = os.listdir(os.path.join(directory, fn))
-            imgs, file_ext = _filter_by_extensions(all_files)
-            imgs.sort()
+        splits = [
+            (fns_in[0], fns_in[1], "imagesTr", "labelsTr"),
+        ]
+        if also_test:
+            splits.append((fns_in[2], fns_in[3], "imagesTs", "labelsTs"))
 
-            out_subfolder = fns_out[fns_in.index(fn)]
-            for i, img in enumerate(imgs):
-                ext = _get_extension(img)
-                new_name = f"{append}_{(i + 1 + start_from):03d}_0000{ext}"
-                if out_subfolder in ("labelsTr", "labelsTs"):
-                    new_name = new_name.replace("_0000", "")
-                name_mappings.append((f"{out_subfolder}/{new_name}", f"{fn}/{img}"))
-                print(f"Copying {img} to {new_name}")
-                if img != new_name:
-                    shutil.copy(
-                        os.path.join(directory, fn, img),
-                        os.path.join(out_data_dir, out_subfolder, new_name),
-                    )
-            if fn == fns_in[0]:
-                num_training = len(imgs)
+        for images_rel, labels_rel, images_out, labels_out in splits:
+            images_dir = os.path.join(directory, images_rel)
+            labels_dir = os.path.join(directory, labels_rel)
+            if not os.path.exists(images_dir):
+                print(f"{images_rel} does not exist")
+                continue
+            if not os.path.exists(labels_dir):
+                print(f"{labels_rel} does not exist")
+                continue
+            mappings, copy_count, file_ext = _copy_matched_pairs(
+                images_dir=images_dir,
+                labels_dir=labels_dir,
+                images_rel=images_rel,
+                labels_rel=labels_rel,
+                out_data_dir=out_data_dir,
+                images_out=images_out,
+                labels_out=labels_out,
+                append=append,
+                start_from=start_from,
+            )
+            name_mappings.extend(mappings)
+            if images_out == "imagesTr":
+                num_training = copy_count
                 file_ending = file_ext
     else:
-        images_dir = os.path.join(directory, "images")
-        labels_dir = os.path.join(directory, fns_in[1])
-        all_files = os.listdir(images_dir)
-        imgs, file_ext = _filter_by_extensions(all_files)
-        imgs.sort()
-        file_ending = file_ext
-
-        copy_count = 0
-        for img in imgs:
-            ext = _get_extension(img)
-            base = _get_base_name(img)
-            label_name = base + ext
-            label_path = os.path.join(labels_dir, label_name)
-            if not os.path.exists(label_path):
-                print(f"Warning: no matching label for {img}, skipping")
-                continue
-            copy_count += 1
-            idx = copy_count + start_from
-            img_new = f"{append}_{idx:03d}_0000{ext}"
-            label_new = f"{append}_{idx:03d}{ext}"
-            name_mappings.append((f"imagesTr/{img_new}", f"images/{img}"))
-            name_mappings.append((f"labelsTr/{label_new}", f"{fns_in[1]}/{label_name}"))
-            print(f"Copying {img} to {img_new}")
-            shutil.copy(
-                os.path.join(images_dir, img),
-                os.path.join(out_data_dir, "imagesTr", img_new),
-            )
-            print(f"Copying {label_name} to {label_new}")
-            shutil.copy(label_path, os.path.join(out_data_dir, "labelsTr", label_new))
-        num_training = copy_count
+        mappings, num_training, file_ending = _copy_matched_pairs(
+            images_dir=os.path.join(directory, "images"),
+            labels_dir=os.path.join(directory, fns_in[1]),
+            images_rel="images",
+            labels_rel=fns_in[1],
+            out_data_dir=out_data_dir,
+            images_out="imagesTr",
+            labels_out="labelsTr",
+            append=append,
+            start_from=start_from,
+        )
+        name_mappings.extend(mappings)
 
     dataset_json = {
         "channel_names": {"0": modality.upper()},

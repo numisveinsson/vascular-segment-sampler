@@ -90,7 +90,7 @@ class TestGatherGlobalVolumes(unittest.TestCase):
             nnunet_outdir=str(nnunet_out),
             yes=True,
         )
-        ds = nnunet_out / "Dataset0999_TOYCT"
+        ds = nnunet_out / "Dataset999_TOYCT"
         self.assertTrue((ds / "dataset.json").is_file())
         images = list((ds / "imagesTr").glob("*.nii.gz"))
         labels = list((ds / "labelsTr").glob("*.nii.gz"))

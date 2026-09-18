@@ -160,7 +160,7 @@ class TestMainWithNnunet(unittest.TestCase):
         
         if result.returncode == 0:
             # Check for nnUNet dataset directory
-            nnunet_dataset_dir = Path(self.temp_dir) / 'Dataset0999_TESTCT'
+            nnunet_dataset_dir = Path(self.temp_dir) / 'Dataset999_TESTCT'
             
             # The directory might exist even if empty
             if nnunet_dataset_dir.exists():
@@ -208,7 +208,7 @@ class TestMainWithNnunet(unittest.TestCase):
         )
         
         # nnUNet dataset should NOT be created
-        nnunet_dataset_dir = Path(self.temp_dir) / 'Dataset0999_TESTCT'
+        nnunet_dataset_dir = Path(self.temp_dir) / 'Dataset999_TESTCT'
         # Note: This might still exist from a previous run, so we just check
         # that the script completed without errors
     
