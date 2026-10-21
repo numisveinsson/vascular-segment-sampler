@@ -50,7 +50,7 @@ WRITE_VTK_THROWOUT: False
 
 MOVE_DIST: 1.5 # how far to move along centerline between sampling, in terms of radius
 SIZE_RADIUS: 5 # unused; volume size uses MU_SIZE (radii at each location)
-RADIUS_ADD: 0.01 # absolute add to MIS radius in cm (before RADIUS_SCALE); 0.1 mm
+RADIUS_ADD: 0.02 # absolute add to MIS radius in cm (before RADIUS_SCALE); 0.2 mm
 RADIUS_SCALE: 1 # keep 1 when image and centerline units match
 LARGE_RADIUS_THRESH: 0.4 # MIS radius in cm at which MOVE_SLOWER_LARGE applies (4 mm)
 

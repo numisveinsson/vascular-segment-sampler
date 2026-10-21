@@ -62,7 +62,13 @@ def scale_polydata(
             x, y, z = x + cx, y + cy, z + cz
         points.SetPoint(i, x, y, z)
 
-    # Also scale any data arrays named 'MaximumInscribedSphereRadius' in point or cell data
+    # Length-valued point/cell arrays. Coordinates are scaled above; these
+    # must use the same factor or radii stay in the old unit.
+    length_array_names = (
+        'MaximumInscribedSphereRadius',
+        'Radius',
+        'radius',
+    )
     try:
         from vascular_segment_sampler.logger import get_logger
         logger = get_logger(__name__)
@@ -72,26 +78,27 @@ def scale_polydata(
     for data_name, data in (('point', polydata.GetPointData()), ('cell', polydata.GetCellData())):
         if not data:
             continue
-        arr = data.GetArray('MaximumInscribedSphereRadius')
-        if arr is None:
-            continue
-        nc = arr.GetNumberOfComponents()
-        n_tuples = arr.GetNumberOfTuples()
-        for tidx in range(n_tuples):
-            if nc == 1:
-                try:
-                    val = arr.GetTuple1(tidx)
-                    arr.SetTuple1(tidx, val * scale_factor)
-                except AttributeError:
-                    tup = arr.GetTuple(tidx)
-                    arr.SetTuple(tidx, (tup[0] * scale_factor,))
-            else:
-                tup = list(arr.GetTuple(tidx))
-                for c in range(nc):
-                    tup[c] = tup[c] * scale_factor
-                arr.SetTuple(tidx, tup)
-        if logger:
-            logger.info(f"Scaled 'MaximumInscribedSphereRadius' in {data_name} data by {scale_factor}")
+        for array_name in length_array_names:
+            arr = data.GetArray(array_name)
+            if arr is None:
+                continue
+            nc = arr.GetNumberOfComponents()
+            n_tuples = arr.GetNumberOfTuples()
+            for tidx in range(n_tuples):
+                if nc == 1:
+                    try:
+                        val = arr.GetTuple1(tidx)
+                        arr.SetTuple1(tidx, val * scale_factor)
+                    except AttributeError:
+                        tup = arr.GetTuple(tidx)
+                        arr.SetTuple(tidx, (tup[0] * scale_factor,))
+                else:
+                    tup = list(arr.GetTuple(tidx))
+                    for c in range(nc):
+                        tup[c] = tup[c] * scale_factor
+                    arr.SetTuple(tidx, tup)
+            if logger:
+                logger.info(f"Scaled '{array_name}' in {data_name} data by {scale_factor}")
 
     polydata.Modified()
 

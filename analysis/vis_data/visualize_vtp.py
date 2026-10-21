@@ -1,169 +1,162 @@
+"""Render each surface mesh in a folder to XZ and YZ PNG images.
+
+Usage:
+    python analysis/vis_data/visualize_vtp.py -i /path/to/meshes -o /path/to/pngs
+    python analysis/vis_data/visualize_vtp.py -i /path/to/meshes -o /path/to/pngs -color
+
+`-color` paints the surface by the `RegionId` array (cell data, then point data).
+If that array is missing it falls back to `Scalars_`. Without `-color` the mesh
+is white. Rendering is off-screen.
+"""
+
+import argparse
 import os
-import glob
-import pyvista as pv
-import numpy as np
 import sys
-# add the folder above
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from modules import vtk_functions as vf
+
+import numpy as np
+import pyvista as pv
+
+VIEWS = ('xz', 'yz')
+MESH_EXTS = {'.vtp', '.stl'}
+_SCALAR_NAMES = ('RegionId', 'Scalars_')
 
 
-def calculate_mesh_centroid(mesh):
-    # Calculate the centroid of the mesh
-    center = mesh.center_of_mass()
-    return np.array(center)
+def list_meshes(input_dir):
+    """Return sorted surface-mesh paths directly inside `input_dir`."""
+    paths = []
+    for name in sorted(os.listdir(input_dir)):
+        if name.startswith('.'):
+            continue
+        ext = os.path.splitext(name)[1].lower()
+        if ext not in MESH_EXTS:
+            continue
+        path = os.path.join(input_dir, name)
+        if os.path.isfile(path):
+            paths.append(path)
+    return paths
 
 
-def visualize_and_save_combined_image(mesh_files, output_file):
-    # Load the meshes and store them in a list
-    meshes = [pv.read(mesh_file) for mesh_file in mesh_files]
+def find_scalar_array(mesh):
+    """Return (array_name, values) for RegionId, else Scalars_, else (None, None).
 
-    # Calculate the centroids of the meshes
-    centroids = [calculate_mesh_centroid(mesh) for mesh in meshes]
-
-    # Find the maximum extent along the x-axis for proper spacing
-    max_extent = max([mesh.GetBounds()[1] for mesh in meshes])
-    max_extent *= 1.5  # Adjust the spacing factor as needed
-
-    # Create a single plotter to display all the meshes
-    plotter = pv.Plotter()
-
-    # Loop over the meshes and add them to the plotter
-    # with appropriate translations
-    for i, (mesh, centroid) in enumerate(zip(meshes, centroids)):
-        # Calculate the translation needed to space the meshes evenly
-        translation = [i * max_extent, 0, 0]
-        translation -= centroid  # Adjust to the centroid of the mesh
-        mesh.translate(translation)
-        plotter.add_mesh(mesh, color='blue')
-
-    # Set up the plotter properties
-    plotter.camera_position = 'xy'
-    plotter.background_color = 'white'
-
-    # Save the plotter view to an image file
-    plotter.show(screenshot=output_file)
+    Cell data is preferred over point data for each name.
+    """
+    for name in _SCALAR_NAMES:
+        if name in mesh.cell_data:
+            return name, np.asarray(mesh.cell_data[name])
+        if name in mesh.point_data:
+            return name, np.asarray(mesh.point_data[name])
+    return None, None
 
 
-def visualize_and_save_screenshot(mesh_file, output_folder, add_name,
-                                  check_region=False, cmap_name='coolwarm'):
-    # Load the mesh
+def scalar_limits(values):
+    """Data range for the colormap. A constant array is given a span of 1."""
+    finite = np.asarray(values, dtype=float)
+    finite = finite[np.isfinite(finite)]
+    if finite.size == 0:
+        return 0.0, 1.0
+    lo = float(finite.min())
+    hi = float(finite.max())
+    if lo == hi:
+        hi = lo + 1.0
+    return lo, hi
+
+
+def render_mesh(mesh_file, output_folder, color_by_region=False):
+    """Write `{stem}_xz.png` and `{stem}_yz.png`. Returns the written paths."""
     mesh = pv.read(mesh_file)
-
-    for position in ['xz', 'yz']:
-        # Create a plotter
-        plotter = pv.Plotter()
-
-        if check_region:
-            mesh_vtp = vf.read_geo(mesh_file).GetOutput()
-            arrays = vf.collect_arrays(mesh_vtp.GetCellData())
-            # if arrays empty, try point data
-            if not arrays:
-                arrays = vf.collect_arrays(mesh_vtp.GetPointData())
-            if 'RegionId' in arrays.keys():
-                region = arrays['RegionId']
-            elif 'Scalars_' in arrays.keys():
-                region = arrays['Scalars_']
-            else:
-                region = None
-
-            if region is not None:
-                cmap_name = 'coolwarm'
-                min_value = 0
-                max_value = 9
-                if region.max() <= 1:
-                    min_value = -6
-                    max_value = 3
-                # Add the mesh with scalar coloring
-                plotter.add_mesh(mesh, scalars=region,
-                                 cmap=cmap_name,
-                                 clim=[min_value, max_value],
-                                 reset_camera=True,
-                                 show_scalar_bar=False)
-            else:
-                # check names
-                names = ['174', '176', '188']
-                for name in names:
-                    if name in mesh_file:
-                        # flip the position
-                        if position == 'xz':
-                            # flip the mesh
-                            # Flip the mesh along the x-axis by creating a transformation matrix
-                            flip_x_matrix = np.array([
-                                [-1,  0,  0,  0],  # Flip along the x-axis
-                                [ 0,  1,  0,  0], 
-                                [ 0,  0,  1,  0], 
-                                [ 0,  0,  0,  1]
-                            ])
-                            mesh.transform(flip_x_matrix)
-                        else:
-                            # Flip the mesh along the y-axis by creating a transformation matrix
-                            flip_y_matrix = np.array([
-                                [ 1,  0,  0,  0], 
-                                [ 0, -1,  0,  0],  # Flip along the y-axis
-                                [ 0,  0,  1,  0], 
-                                [ 0,  0,  0,  1]
-                            ])
-                            mesh.transform(flip_y_matrix)
-                # Add the mesh without scalar coloring
-                plotter.add_mesh(mesh, color='white', reset_camera=True)
-
+    if mesh.n_points == 0:
+        raise ValueError('mesh has no points')
+    scalar_name = None
+    clim = None
+    if color_by_region:
+        scalar_name, values = find_scalar_array(mesh)
+        if values is None:
+            print(
+                f'Warning: no RegionId or Scalars_ on {mesh_file}; rendering white.',
+                file=sys.stderr,
+            )
         else:
-            # Add the mesh to the plotter
-            plotter.add_mesh(mesh, color='white', reset_camera=True)
+            clim = scalar_limits(values)
 
-        # Set up the camera and style (adjust as needed)
-        plotter.camera_position = position
+    stem = os.path.splitext(os.path.basename(mesh_file))[0]
+    written = []
+    for position in VIEWS:
+        plotter = pv.Plotter(off_screen=True, window_size=(1024, 1024))
+        try:
+            if scalar_name is not None:
+                plotter.add_mesh(
+                    mesh,
+                    scalars=scalar_name,
+                    cmap='coolwarm',
+                    clim=list(clim),
+                    show_scalar_bar=False,
+                )
+            else:
+                plotter.add_mesh(mesh, color='white')
+            plotter.set_background('white')
+            plotter.show_axes = False
+            plotter.camera_position = position
+            plotter.camera.zoom(0.9)
+            out_path = os.path.join(output_folder, f'{stem}_{position}.png')
+            plotter.screenshot(out_path)
+            written.append(out_path)
+        finally:
+            plotter.close()
+    return written
 
-        # zoom in
-        plotter.camera.zoom(0.9)
-        # set background to white
-        plotter.background_color = 'white'
-        # set axes off
-        plotter.show_axes = False
-        # Save screenshot as SVG
-        screenshot_file = os.path.join(output_folder, os.path.splitext(os.path.basename(mesh_file))[0] + '_' + add_name + '_' + position + '.png')
-        plotter.show(screenshot=screenshot_file)
 
-        # Close the plotter
-        plotter.close()
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(
+        description='Render surface meshes in a folder to XZ and YZ PNG images.'
+    )
+    parser.add_argument(
+        '-i', '--input', required=True,
+        help='Folder of surface meshes (.vtp or .stl)',
+    )
+    parser.add_argument(
+        '-o', '--output', required=True,
+        help='Folder to write PNG renders',
+    )
+    parser.add_argument(
+        '-color', '--color', action='store_true',
+        help='Color by RegionId, or Scalars_ if RegionId is absent',
+    )
+    return parser.parse_args(argv)
 
 
-if __name__ == "__main__":
+def main(argv=None):
+    args = parse_args(argv)
+    input_dir = args.input
+    output_dir = args.output
 
-    check_region = True
+    if not os.path.isdir(input_dir):
+        print(f'Error: input is not a directory: {input_dir}', file=sys.stderr)
+        return 1
 
-    main_dir = '/Users/numisveins/Downloads/preds_new_aortas/'
-    main_dir = '/Users/numisveins/Documents/data_seqseg_paper/pred_aortas_june24_3/'
-    main_dir = '/Users/numisveins/Documents/data_combo_paper/ct_data/vascular_segs/vascular_segs_mha/'
-    main_dir = '/Users/numisveins/Documents/data_combo_paper/figures/ct/'
-    # main_dir = '/Users/numisveins/Documents/data_seqseg_paper/pred_mic_aortas_june24/results/'
-    # main_dir = '//Users/numisveins/Documents/MICCAI_Challenge23_Aorta_Tree_Data/'
-    add_name = ''
-    dir_list = os.listdir(main_dir)
-    dir_list.sort()
-    dir_list = [x for x in dir_list if not x.startswith('.')]
-    # dir_list = [x for x in dir_list if 'pred' in x and 'old' not in x]
+    mesh_files = list_meshes(input_dir)
+    if not mesh_files:
+        print(f'Error: no .vtp or .stl files in {input_dir}', file=sys.stderr)
+        return 1
 
-    for i in range(len(dir_list)):
+    os.makedirs(output_dir, exist_ok=True)
+    n_ok = 0
+    for mesh_file in mesh_files:
+        try:
+            written = render_mesh(mesh_file, output_dir, color_by_region=args.color)
+        except Exception as exc:
+            print(f'Warning: failed to render {mesh_file}: {exc}', file=sys.stderr)
+            continue
+        n_ok += 1
+        for path in written:
+            print(f'Wrote {path}')
 
-        meshes_directory = main_dir + dir_list[i]  # + '/postprocessed/'
+    if n_ok == 0:
+        print('Error: no meshes were rendered', file=sys.stderr)
+        return 1
+    print(f'Done. Rendered {n_ok} of {len(mesh_files)} meshes to {output_dir}')
+    return 0
 
-        # Specify the output folder for screenshots
-        output_folder = meshes_directory+'/imgs/'
 
-        # Ensure the output folder exists, create it if necessary
-        os.makedirs(output_folder, exist_ok=True)
-
-        # Loop over all .vtp files in the specified directory
-        mesh_files = glob.glob(os.path.join(meshes_directory, '*.vtp'))
-
-        # Specify the output file for the final image
-        output_file = os.path.join(output_folder, 'render.png')
-        # visualize_and_save_combined_image(mesh_files, output_file)
-
-        # Visualize the meshes and save screenshots
-        for mesh_file in mesh_files:
-            visualize_and_save_screenshot(mesh_file, output_folder, add_name, check_region)
-
-        print("Images saved successfully.")
+if __name__ == '__main__':
+    raise SystemExit(main())

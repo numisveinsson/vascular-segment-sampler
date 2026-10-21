@@ -555,7 +555,8 @@ def fingerprint_dataset(
     Args:
         base_folder: Path to folder containing images/ (required) and optional
             surfaces/, centerlines/, truths/ subfolders
-        output_file: Optional path to save JSON report
+        output_file: Optional path to save the JSON report. A .txt with the
+            headline counts is written beside it.
         max_samples: Optional limit on number of files to analyze (for large datasets)
         config_path: Optional YAML path (same shape as pipeline configs). DATA_DIR is taken from
             base_folder; cohort filters (e.g. MODALITY, ANATOMY, VMR spreadsheet) restrict cases.
@@ -639,16 +640,14 @@ def fingerprint_dataset(
     for folder, count in consistency_report['names_per_folder'].items():
         print(f"  {folder}: {count} files")
 
-    # Process cases in images; intersect with truths when that folder is present
+    # Process every image case. Surfaces, centerlines, and truths are read
+    # when present; a missing truth does not drop the case.
     image_names = set(name_sets.get('images', set()))
     truth_names = set(name_sets.get('truths', set()))
     truths_folder = os.path.join(base_folder, 'truths')
     has_truths = os.path.isdir(truths_folder) and bool(truth_names)
-    if has_truths:
-        folder_common_names = image_names & truth_names
-    else:
-        folder_common_names = image_names
-    common_names = sorted(folder_common_names)
+    case_names = image_names
+    common_names = sorted(case_names)
 
     config_meta = None
     if config_path and loaded_cfg is not None:
@@ -680,18 +679,20 @@ def fingerprint_dataset(
                 f"{config_meta['note']}"
             )
 
-    if has_truths:
-        print(f"  Cases in both images and truths (folder): {len(folder_common_names)}")
-    else:
-        print(f"  Cases in images folder: {len(folder_common_names)}")
+    print(f"  Cases in images folder: {len(case_names)}")
     if config_meta and config_meta.get('cases_after_filter') is not None:
         print(f"  Cases after config cohort filter: {config_meta['cases_after_filter']}")
     if has_truths:
-        if len(image_names) > len(folder_common_names):
-            missing_truths = len(image_names - truth_names)
-            print(f"    ({missing_truths} images without corresponding truths)")
-        if len(truth_names) > len(folder_common_names):
-            missing_images = len(truth_names - image_names)
+        paired = image_names & truth_names
+        print(f"  Cases with both images and truths: {len(paired)}")
+        missing_truths = len(image_names - truth_names)
+        if missing_truths:
+            print(
+                f"    ({missing_truths} images without corresponding truths; "
+                "images, surfaces, and centerlines still analyzed)"
+            )
+        missing_images = len(truth_names - image_names)
+        if missing_images:
             print(f"    ({missing_images} truths without corresponding images)")
 
     if max_samples and len(common_names) > max_samples:
@@ -760,23 +761,95 @@ def fingerprint_dataset(
                 else:
                     results['surfaces'][name] = stats
     
+    analyzed = set(common_names)
+    surface_names = set(name_sets.get('surfaces', set()))
+    centerline_names = set(name_sets.get('centerlines', set()))
+    counts = {
+        'cases_analyzed': len(analyzed),
+        'images': len(analyzed & image_names),
+        'truths': len(analyzed & truth_names),
+        'surfaces': len(analyzed & surface_names),
+        'centerlines': len(analyzed & centerline_names),
+    }
+    if os.path.isdir(truths_folder):
+        counts['images_without_truths'] = len(analyzed - truth_names)
+        counts['truths_without_images'] = len(truth_names - image_names)
+    results['counts'] = counts
+
     # Generate summary statistics
     print("\nGenerating summary statistics...")
     results['summary'] = generate_summary(results)
-    
-    # Print summary
-    print_summary(results['summary'])
-    
+
+    report_text = format_report(results)
+    print("\n" + report_text)
+
     # Save to file if requested
     if output_file:
         # Convert numpy types to native Python for JSON serialization
         results_serializable = convert_to_serializable(results)
-        
+
         with open(output_file, 'w') as f:
             json.dump(results_serializable, f, indent=2)
         print(f"\nResults saved to: {output_file}")
-    
+
+        summary_path = summary_text_path(output_file)
+        with open(summary_path, 'w', encoding='utf-8') as f:
+            f.write(report_text)
+            if not report_text.endswith('\n'):
+                f.write('\n')
+        print(f"Summary saved to: {summary_path}")
+
     return results
+
+
+def summary_text_path(output_file):
+    """Path for the headline-counts text file written next to the JSON report."""
+    root, ext = os.path.splitext(output_file)
+    if ext.lower() == '.txt':
+        return output_file
+    return root + '.txt'
+
+
+def format_headline(results):
+    """Headline counts: cases and files present, including images that lack truths."""
+    counts = results.get('counts') or {}
+    lines = ["DATASET FINGERPRINT"]
+    if results.get('base_folder'):
+        lines.append(f"Folder: {results['base_folder']}")
+    cfg = results.get('config_filter') or {}
+    if cfg.get('config_path'):
+        lines.append(
+            f"Config: {cfg['config_path']} (split={cfg.get('split_mode')})"
+        )
+    lines.append("")
+    labels = (
+        ('cases_analyzed', 'Cases analyzed'),
+        ('images', 'Images'),
+        ('truths', 'Truths'),
+        ('images_without_truths', 'Images without truths'),
+        ('truths_without_images', 'Truths without images'),
+        ('surfaces', 'Surfaces'),
+        ('centerlines', 'Centerlines'),
+    )
+    for key, label in labels:
+        if key in counts and counts[key] is not None:
+            lines.append(f"{label}: {counts[key]}")
+
+    errors = results.get('errors') or {}
+    error_bits = []
+    for key in ('images', 'truths', 'centerlines', 'surfaces', 'image_bounds'):
+        n = len(errors.get(key) or [])
+        if n:
+            error_bits.append(f"{key}={n}")
+    if error_bits:
+        lines.append(f"Analysis errors: {', '.join(error_bits)}")
+    return "\n".join(lines)
+
+
+def format_report(results):
+    """Headline counts plus the dataset summary, as plain text."""
+    parts = [format_headline(results), format_summary(results.get('summary') or {})]
+    return "\n".join(part for part in parts if part)
 
 
 def convert_to_serializable(obj):
@@ -795,6 +868,31 @@ def convert_to_serializable(obj):
         return list(obj)
     else:
         return obj
+
+
+def _cases_outside_bounds(modality_data):
+    """Cases whose points are not fully inside the image bounds."""
+    cases = []
+    for name, stats in modality_data.items():
+        check = stats.get('containment_check')
+        if check and not check.get('all_points_contained', True):
+            cases.append({
+                'name': name,
+                'out_of_bounds_count': check.get('out_of_bounds_count', 0),
+            })
+    cases.sort(key=lambda case: case['name'])
+    return cases
+
+
+def _format_out_of_bounds_cases(containment):
+    """Lines listing cases whose points fall outside the image bounds."""
+    cases = containment.get('cases_with_out_of_bounds_points') or []
+    if not cases:
+        return []
+    lines = ["    Cases with points outside image bounds:"]
+    for case in cases:
+        lines.append(f"      {case['name']}: {case['out_of_bounds_count']} points")
+    return lines
 
 
 def generate_summary(results):
@@ -881,12 +979,13 @@ def generate_summary(results):
         containment_checks = [v.get('containment_check') for v in cent_data.values() 
                              if 'containment_check' in v]
         if containment_checks:
-            files_with_oob = sum(1 for c in containment_checks if not c['all_points_contained'])
+            oob_cases = _cases_outside_bounds(cent_data)
             total_oob_points = sum(c['out_of_bounds_count'] for c in containment_checks)
             summary['centerlines']['containment'] = {
                 'files_checked': len(containment_checks),
-                'files_with_out_of_bounds_points': files_with_oob,
+                'files_with_out_of_bounds_points': len(oob_cases),
                 'total_out_of_bounds_points': total_oob_points,
+                'cases_with_out_of_bounds_points': oob_cases,
             }
     
     # Surface statistics
@@ -905,101 +1004,139 @@ def generate_summary(results):
         containment_checks = [v.get('containment_check') for v in surf_data.values() 
                              if 'containment_check' in v]
         if containment_checks:
-            files_with_oob = sum(1 for c in containment_checks if not c['all_points_contained'])
+            oob_cases = _cases_outside_bounds(surf_data)
             total_oob_points = sum(c['out_of_bounds_count'] for c in containment_checks)
             summary['surfaces']['containment'] = {
                 'files_checked': len(containment_checks),
-                'files_with_out_of_bounds_points': files_with_oob,
+                'files_with_out_of_bounds_points': len(oob_cases),
                 'total_out_of_bounds_points': total_oob_points,
+                'cases_with_out_of_bounds_points': oob_cases,
             }
     
     return summary
 
 
-def print_summary(summary):
-    """Print formatted summary statistics."""
-    print("\n" + "=" * 80)
-    print("DATASET SUMMARY")
-    print("=" * 80)
-    
-    # Print file type mismatch warnings if present
+def format_summary(summary):
+    """Format dataset summary statistics as plain text."""
+    lines = ["=" * 80, "DATASET SUMMARY", "=" * 80]
+
     if 'file_type_mismatches' in summary:
         mismatches = summary['file_type_mismatches']
         if mismatches.get('masks_in_images') or mismatches.get('images_in_truths'):
-            print("\n⚠️  FILE TYPE MISMATCHES DETECTED:")
+            lines.append("")
+            lines.append("FILE TYPE MISMATCHES DETECTED:")
             if mismatches.get('masks_in_images'):
-                print(f"  Masks in 'images' folder: {len(mismatches['masks_in_images'])} files")
-                print(f"    Files: {mismatches['masks_in_images'][:5]}")
+                lines.append(
+                    f"  Masks in 'images' folder: {len(mismatches['masks_in_images'])} files"
+                )
+                lines.append(f"    Files: {mismatches['masks_in_images'][:5]}")
                 if len(mismatches['masks_in_images']) > 5:
-                    print(f"    ... and {len(mismatches['masks_in_images']) - 5} more")
+                    lines.append(
+                        f"    ... and {len(mismatches['masks_in_images']) - 5} more"
+                    )
             if mismatches.get('images_in_truths'):
-                print(f"  Images in 'truths' folder: {len(mismatches['images_in_truths'])} files")
-                print(f"    Files: {mismatches['images_in_truths'][:5]}")
+                lines.append(
+                    f"  Images in 'truths' folder: {len(mismatches['images_in_truths'])} files"
+                )
+                lines.append(f"    Files: {mismatches['images_in_truths'][:5]}")
                 if len(mismatches['images_in_truths']) > 5:
-                    print(f"    ... and {len(mismatches['images_in_truths']) - 5} more")
-    
+                    lines.append(
+                        f"    ... and {len(mismatches['images_in_truths']) - 5} more"
+                    )
+
     if 'images' in summary:
-        print("\nIMAGES:")
-        print(f"  Files: {summary['images']['num_files']}")
-        print(f"  Unique spacings: {summary['images']['spacing_unique']}")
-        print(f"  Spacing range:")
+        lines.append("")
+        lines.append("IMAGES:")
+        lines.append(f"  Files: {summary['images']['num_files']}")
+        lines.append(f"  Unique spacings: {summary['images']['spacing_unique']}")
+        lines.append("  Spacing range:")
         for axis, (min_val, max_val) in summary['images']['spacing_range'].items():
-            print(f"    {axis}: [{min_val:.4f}, {max_val:.4f}]")
-        print(f"  Unique sizes: {summary['images']['size_unique']}")
-        print(f"  Size range:")
+            lines.append(f"    {axis}: [{min_val:.4f}, {max_val:.4f}]")
+        lines.append(f"  Unique sizes: {summary['images']['size_unique']}")
+        lines.append("  Size range:")
         for axis, (min_val, max_val) in summary['images']['size_range'].items():
-            print(f"    {axis}: [{min_val}, {max_val}]")
-        print(f"  Intensity range: [{summary['images']['intensity_range'][0]:.2f}, {summary['images']['intensity_range'][1]:.2f}]")
-        print(f"  Pixel types: {', '.join(summary['images']['pixel_types'])}")
-    
+            lines.append(f"    {axis}: [{min_val}, {max_val}]")
+        lines.append(
+            "  Intensity range: "
+            f"[{summary['images']['intensity_range'][0]:.2f}, "
+            f"{summary['images']['intensity_range'][1]:.2f}]"
+        )
+        lines.append(f"  Pixel types: {', '.join(summary['images']['pixel_types'])}")
+
     if 'truths' in summary:
-        print("\nSEGMENTATIONS (TRUTHS):")
-        print(f"  Files: {summary['truths']['num_files']}")
-        print(f"  Unique labels across dataset: {summary['truths']['all_unique_labels']}")
-        print(f"  Label frequency: {summary['truths']['label_frequency']}")
-        print(f"  Binary segmentations: {summary['truths']['binary_segmentations']}")
-        print(f"  Multi-class segmentations: {summary['truths']['multi_class_segmentations']}")
-    
+        lines.append("")
+        lines.append("SEGMENTATIONS (TRUTHS):")
+        lines.append(f"  Files: {summary['truths']['num_files']}")
+        lines.append(
+            f"  Unique labels across dataset: {summary['truths']['all_unique_labels']}"
+        )
+        lines.append(f"  Label frequency: {summary['truths']['label_frequency']}")
+        lines.append(
+            f"  Binary segmentations: {summary['truths']['binary_segmentations']}"
+        )
+        lines.append(
+            f"  Multi-class segmentations: {summary['truths']['multi_class_segmentations']}"
+        )
+
     if 'centerlines' in summary:
-        print("\nCENTERLINES:")
-        print(f"  Files: {summary['centerlines']['num_files']}")
-        print(f"  Avg points: {summary['centerlines']['avg_points']:.1f}")
-        print(f"  Avg lines: {summary['centerlines']['avg_lines']:.1f}")
+        lines.append("")
+        lines.append("CENTERLINES:")
+        lines.append(f"  Files: {summary['centerlines']['num_files']}")
+        lines.append(f"  Avg points: {summary['centerlines']['avg_points']:.1f}")
+        lines.append(f"  Avg lines: {summary['centerlines']['avg_lines']:.1f}")
         if 'branches_range' in summary['centerlines']:
-            print(f"  Branches range: {summary['centerlines']['branches_range']}")
-            print(f"  Avg branches: {summary['centerlines']['avg_branches']:.1f}")
+            lines.append(f"  Branches range: {summary['centerlines']['branches_range']}")
+            lines.append(f"  Avg branches: {summary['centerlines']['avg_branches']:.1f}")
         if 'length_range' in summary['centerlines']:
-            print(f"  Length range: [{summary['centerlines']['length_range'][0]:.2f}, {summary['centerlines']['length_range'][1]:.2f}]")
-            print(f"  Avg length: {summary['centerlines']['avg_length']:.2f}")
-        if 'length_range' in summary['centerlines']:
-            print(f"  Length range: [{summary['centerlines']['length_range'][0]:.2f}, {summary['centerlines']['length_range'][1]:.2f}]")
-            print(f"  Avg length: {summary['centerlines']['avg_length']:.2f}")
+            lines.append(
+                "  Length range: "
+                f"[{summary['centerlines']['length_range'][0]:.2f}, "
+                f"{summary['centerlines']['length_range'][1]:.2f}]"
+            )
+            lines.append(f"  Avg length: {summary['centerlines']['avg_length']:.2f}")
         if 'containment' in summary['centerlines']:
             cont = summary['centerlines']['containment']
-            print(f"  Containment check: {cont['files_checked']} files checked")
+            lines.append(f"  Containment check: {cont['files_checked']} files checked")
             if cont['files_with_out_of_bounds_points'] > 0:
-                print(f"    WARNING: {cont['files_with_out_of_bounds_points']} files have points outside image bounds!")
-                print(f"    Total out-of-bounds points: {cont['total_out_of_bounds_points']}")
+                lines.append(
+                    "    WARNING: "
+                    f"{cont['files_with_out_of_bounds_points']} files have points "
+                    "outside image bounds!"
+                )
+                lines.append(
+                    f"    Total out-of-bounds points: {cont['total_out_of_bounds_points']}"
+                )
+                lines.extend(_format_out_of_bounds_cases(cont))
             else:
-                print(f"    ✓ All centerline points contained within image bounds")
-    
+                lines.append("    All centerline points contained within image bounds")
+
     if 'surfaces' in summary:
-        print("\nSURFACES:")
-        print(f"  Files: {summary['surfaces']['num_files']}")
-        print(f"  Avg points: {summary['surfaces']['avg_points']:.1f}")
-        print(f"  Avg cells: {summary['surfaces']['avg_cells']:.1f}")
-        print(f"  Avg surface area: {summary['surfaces']['avg_surface_area']:.2f}")
-        print(f"  Avg volume: {summary['surfaces']['avg_volume']:.2f}")
+        lines.append("")
+        lines.append("SURFACES:")
+        lines.append(f"  Files: {summary['surfaces']['num_files']}")
+        lines.append(f"  Avg points: {summary['surfaces']['avg_points']:.1f}")
+        lines.append(f"  Avg cells: {summary['surfaces']['avg_cells']:.1f}")
+        lines.append(f"  Avg surface area: {summary['surfaces']['avg_surface_area']:.2f}")
+        lines.append(f"  Avg volume: {summary['surfaces']['avg_volume']:.2f}")
         if 'containment' in summary['surfaces']:
             cont = summary['surfaces']['containment']
-            print(f"  Containment check: {cont['files_checked']} files checked")
+            lines.append(f"  Containment check: {cont['files_checked']} files checked")
             if cont['files_with_out_of_bounds_points'] > 0:
-                print(f"    WARNING: {cont['files_with_out_of_bounds_points']} files have points outside image bounds!")
-                print(f"    Total out-of-bounds points: {cont['total_out_of_bounds_points']}")
+                lines.append(
+                    "    WARNING: "
+                    f"{cont['files_with_out_of_bounds_points']} files have points "
+                    "outside image bounds!"
+                )
+                lines.append(
+                    f"    Total out-of-bounds points: {cont['total_out_of_bounds_points']}"
+                )
+                lines.extend(_format_out_of_bounds_cases(cont))
             else:
-                print(f"    ✓ All surface points contained within image bounds")
-    
-    print("\n" + "=" * 80)
+                lines.append("    All surface points contained within image bounds")
+
+    lines.append("")
+    lines.append("=" * 80)
+    return "\n".join(lines)
 
 
 if __name__ == '__main__':
@@ -1007,7 +1144,11 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='Extract dataset fingerprint')
     parser.add_argument('folder', type=str, help='Path to dataset folder')
-    parser.add_argument('--output', '-o', type=str, help='Output JSON file path (default: saves in dataset folder)')
+    parser.add_argument(
+        '--output', '-o', type=str,
+        help='Output JSON file path (default: saves in dataset folder). '
+             'A .txt with the headline counts is written beside it.',
+    )
     parser.add_argument('--max-samples', '-n', type=int, help='Maximum number of samples to analyze')
     parser.add_argument(
         '--config',

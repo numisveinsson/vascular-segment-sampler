@@ -415,27 +415,27 @@ if __name__ == '__main__':
         epilog="""
 Examples:
   # Random split: 80%% training, 20%% testing (copy files)
-  python dataset_dirs/split_train_test.py --folder /path/to/data --train_split 0.8
+  python dataset_dirs/split_train_test.py -i /path/to/data --train_split 0.8
 
   # Split from VMR CSV (match file basenames to legacy_name column)
-  python dataset_dirs/split_train_test.py --folder /path/to/data \\
+  python dataset_dirs/split_train_test.py -i /path/to/data \\
       --split-csv dataset_dirs/VMR_train_test_split.csv
 
   # CSV split when files use the 'name' column instead of legacy_name
-  python dataset_dirs/split_train_test.py --folder /path/to/data \\
+  python dataset_dirs/split_train_test.py -i /path/to/data \\
       --split-csv dataset_dirs/VMR_train_test_split.csv --csv-id-column name
 
   # Only split images and truths subfolders
-  python dataset_dirs/split_train_test.py --folder /path/to/data --train_split 0.8 \\
+  python dataset_dirs/split_train_test.py -i /path/to/data --train_split 0.8 \\
       --subfolders images truths
 
   # Discover cases from images only, but also move centerlines and truths
-  python dataset_dirs/split_train_test.py --folder /path/to/data --train_split 0.8 \\
+  python dataset_dirs/split_train_test.py -i /path/to/data --train_split 0.8 \\
       --case-subfolders images --subfolders images centerlines truths
         """
     )
     
-    parser.add_argument('--folder', '--input_folder', '--input-folder',
+    parser.add_argument('-i', '--folder', '--input_folder', '--input-folder',
                        type=str,
                        required=True,
                        help='Path to folder containing subfolders (images, centerlines, surfaces, truths, labels)')

@@ -82,7 +82,7 @@ Library defaults ship in `vascular_segment_sampler/config/` and are installed wi
 
 - `default_mm.yaml` — DICOM-style millimeters (the merge base)
 - `default_cm.yaml` — VMR / SimVascular centimeters
-- `default_mm_coronary.yaml` — millimeters with a larger `RADIUS_ADD` for coronary
+- `default_mm_coronary.yaml` — millimeters, same `RADIUS_ADD` (0.2 mm) as `default_mm`
 
 Repo-root `config/` holds experiment overlays (`global.yaml`, VMR splits, and so on). Named configs overlay `default_mm` at load time. Sampling knobs `MOVE_DIST` / `MU_SIZE` are radius-relative (same for aorta and coronary). Absolute keys `RADIUS_ADD` and `LARGE_RADIUS_THRESH` differ by unit.
 

@@ -93,17 +93,24 @@ def get_dataset_cases(directory, img_ext=None, test_cases=None, testing=False):
     else:
         print(f"Found {len(cases_im)} images")
 
-    cases_cent = os.listdir(os.path.join(directory, 'centerlines'))
-    cases_cent = [f for f in cases_cent if f.endswith('.vtp')]
-    cases_cent = [f.replace('.vtp', '') for f in cases_cent]
+    cases_cent = []
+    for f in os.listdir(os.path.join(directory, 'centerlines')):
+        # Skip AppleDouble / hidden files (``._case.vtp``). They are not cases.
+        if f.startswith('.') or not f.endswith('.vtp'):
+            continue
+        cases_cent.append(f[: -len('.vtp')])
     print(f"Found {len(cases_cent)} centerlines")
 
     # if surface folder exists
     if os.path.exists(os.path.join(directory, 'surfaces')):
-        cases_surf = os.listdir(os.path.join(directory, 'surfaces'))
-        cases_surf = [f for f in cases_surf if f.endswith('.vtp')]
-        cases_surf = [f.replace('.vtp', '') for f in cases_surf]
-        cases_surf = [f.replace('.seg', '') for f in cases_surf]
+        cases_surf = []
+        for f in os.listdir(os.path.join(directory, 'surfaces')):
+            if f.startswith('.') or not f.endswith('.vtp'):
+                continue
+            stem = f[: -len('.vtp')]
+            if stem.endswith('.seg'):
+                stem = stem[: -len('.seg')]
+            cases_surf.append(stem)
         print(f"Found {len(cases_surf)} surfaces")
     else:
         print("No surfaces found")
@@ -116,21 +123,26 @@ def get_dataset_cases(directory, img_ext=None, test_cases=None, testing=False):
         test_cases_w_img.sort()
         return test_cases_w_img
     else:
-        # only keep cases that have all files
-        cases = [f for f in cases_im if f in cases_cent]
-        print(f"Found {len(cases)} training cases with all files")
-        print(f"Returning {len(cases_cent)} cases, that all have centerlines")
-        print(f"The cases that have images but no centerlines are:")
-        print([f for f in cases_im if f not in cases_cent])
-
-        # remove the test cases
-        test_cases_in_cent = [f for f in cases_cent if f in test_cases]
-        print(f"Found {len(test_cases_in_cent)} test cases in cases dataset, removing them")
-        cases_cent = [f for f in cases_cent if f not in test_cases]
-        print(f"Returning {len(cases_cent)} cases, that have all centerlines, and are not test cases")
-        # sort the cases, so they are in the same order
-        cases_cent.sort()
-        return cases_cent
+        # Image and centerline must share a stem. Extra .vtp files (and
+        # ``._*.vtp`` copies) are not cases; reading them crashes whole-volume
+        # gathering on a missing image.
+        cent_set = set(cases_cent)
+        im_set = set(cases_im)
+        cases = [f for f in cases_im if f in cent_set and f not in test_cases]
+        print(f"Found {len(cases)} training cases with image and centerline")
+        images_without_cent = sorted(im_set - cent_set)
+        cents_without_image = sorted(cent_set - im_set)
+        if images_without_cent:
+            print("Images with no centerline (skipped):")
+            print(images_without_cent)
+        if cents_without_image:
+            print("Centerlines with no image (skipped):")
+            print(cents_without_image)
+        test_cases_removed = sorted(im_set & cent_set & set(test_cases))
+        print(f"Found {len(test_cases_removed)} test cases, removing them")
+        cases.sort()
+        print(f"Returning {len(cases)} cases")
+        return cases
 
 class VMR_dataset:
     """

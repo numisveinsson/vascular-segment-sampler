@@ -27,7 +27,10 @@ def resolve_config_path(config):
     if os.path.isfile(config_path):
         return config_path
 
-    candidate = config_path if config_path.endswith(".yaml") else config_path + ".yaml"
+    if config_path.endswith((".yaml", ".yml")):
+        candidate = config_path
+    else:
+        candidate = config_path + ".yaml"
     basename = os.path.basename(candidate)
     cwd_cfg = os.path.join("config", basename)
     pkg_cfg = os.path.join(_PKG_DIR, "config", basename)

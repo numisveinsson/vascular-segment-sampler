@@ -1,0 +1,28 @@
+# Smoke-test overlay on packaged default_mm.yaml.
+# One extract per point, long steps, and a hard cap so a case finishes quickly.
+# Inherits RADIUS_ADD (0.2 mm) and the other sampling defaults.
+#
+#   python3 main.py --config_name test.yml --data_dir /path/to/data --outdir /tmp/vss-test
+
+MAX_SAMPLES: 12
+
+MOVE_DIST: 8 # centerline step, in radii (default 1.5)
+MOVE_SLOWER_LARGE: 1
+MOVE_SLOWER_BIFURC: 1
+
+NUMBER_SAMPLES: 1
+NUMBER_SAMPLES_BIFURC: 1
+NUMBER_SAMPLES_START: 1
+
+WRITE_IMG: True
+WRITE_SURFACE: False
+WRITE_CENTERLINE: False
+WRITE_VTK: False
+WRITE_VTK_THROWOUT: False
+WRITE_TRAJECTORIES: False
+WRITE_CROSS_SECTIONAL: False
+WRITE_OUTLET_STATS: False
+WRITE_OUTLET_IMG: False
+WRITE_DISCRETE_CENTERLINE: False
+WRITE_VOXEL_PYRAMID: False
+VALIDATION_PROP: 0.0
