@@ -15,12 +15,12 @@ class TestLoadConfig(unittest.TestCase):
 
     def test_package_ships_only_library_defaults(self):
         pkg = Path(io._PKG_DIR) / "config"
-        names = sorted(p.name for p in pkg.glob("*.yaml"))
+        names = sorted(p.name for p in pkg.iterdir() if p.suffix in {".yaml", ".yml"})
         self.assertEqual(
             names,
-            ["default_cm.yaml", "default_mm.yaml", "default_mm_coronary.yaml"],
+            ["default_cm.yaml", "default_mm.yaml", "test.yml"],
         )
-        for name in ("default_mm", "default_cm", "default_mm_coronary"):
+        for name in ("default_mm", "default_cm", "test.yml"):
             resolved = Path(io.resolve_config_path(name)).resolve()
             self.assertEqual(resolved.parent, pkg.resolve())
 
@@ -33,14 +33,6 @@ class TestLoadConfig(unittest.TestCase):
         self.assertEqual(cfg["MIN_DIM"], 5)
         self.assertEqual(cfg["UNITS"], "mm")
         self.assertEqual(cfg["LARGE_RADIUS_THRESH"], 4.0)
-
-    def test_default_mm_coronary_overrides_radius_add(self):
-        mm = load_config("default_mm")
-        coronary = load_config("default_mm_coronary")
-        self.assertEqual(coronary["UNITS"], "mm")
-        self.assertEqual(coronary["RADIUS_ADD"], 0.2)
-        self.assertEqual(coronary["MOVE_DIST"], mm["MOVE_DIST"])
-        self.assertEqual(coronary["LARGE_RADIUS_THRESH"], mm["LARGE_RADIUS_THRESH"])
 
     def test_default_mm_scales_absolute_lengths(self):
         mm = load_config("default_mm")
@@ -56,7 +48,8 @@ class TestLoadConfig(unittest.TestCase):
 
     def test_test_yml_caps_samples_and_keeps_mm_defaults(self):
         cfg = load_config("test.yml")
-        self.assertEqual(Path(io.resolve_config_path("test.yml")).name, "test.yml")
+        packaged = (Path(io._PKG_DIR) / "config" / "test.yml").resolve()
+        self.assertEqual(Path(io.resolve_config_path("test.yml")).resolve(), packaged)
         self.assertEqual(Path(io.resolve_config_path("test")).name, "test.yaml")
         self.assertEqual(cfg["MAX_SAMPLES"], 12)
         self.assertEqual(cfg["MOVE_DIST"], 8)

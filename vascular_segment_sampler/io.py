@@ -21,7 +21,8 @@ def resolve_config_path(config):
 
     Bare names look in ``./config/`` (experiment overlays) then the packaged
     ``vascular_segment_sampler/config/`` (library defaults: ``default_mm``,
-    ``default_cm``, ``default_mm_coronary``). Existing file paths are used as-is.
+    ``default_cm``, ``test.yml``). Existing file paths
+    are used as-is.
     """
     config_path = str(config)
     if os.path.isfile(config_path):

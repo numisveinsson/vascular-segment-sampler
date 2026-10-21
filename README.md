@@ -82,7 +82,7 @@ Library defaults ship in `vascular_segment_sampler/config/` and are installed wi
 
 - `default_mm.yaml` — DICOM-style millimeters (the merge base)
 - `default_cm.yaml` — VMR / SimVascular centimeters
-- `default_mm_coronary.yaml` — millimeters, same `RADIUS_ADD` (0.2 mm) as `default_mm`
+- `test.yml` — smoke test: one sample per point, long steps, 12 samples per case
 
 Repo-root `config/` holds experiment overlays (`global.yaml`, VMR splits, and so on). Named configs overlay `default_mm` at load time. Sampling knobs `MOVE_DIST` / `MU_SIZE` are radius-relative (same for aorta and coronary). Absolute keys `RADIUS_ADD` and `LARGE_RADIUS_THRESH` differ by unit.
 
@@ -136,7 +136,7 @@ python3 main.py \
 - `--data_dir` / `-data_dir`: Directory where input data is stored
 
 **Optional Arguments:**
-- `--config_name` / `-config_name`: Packaged default (`default_mm`, `default_cm`, `default_mm_coronary`), a YAML name under `config/`, or a path. Defaults to `default_mm` (millimeters). Use `default_cm` for VMR/SimVascular centimeters.
+- `--config_name` / `-config_name`: Packaged default (`default_mm`, `default_cm`, `test.yml`), a YAML name under `config/`, or a path. Defaults to `default_mm` (millimeters). Use `default_cm` for VMR/SimVascular centimeters. Use `test.yml` for a short smoke-test run.
 - `--outdir` / `-outdir`: Output directory for extracted data (default: `./extracted_data/`)
 - `--perc_dataset` / `-perc_dataset`: Percentage of dataset to use, 0.0 to 1.0 (default: `1.0`)
 - `--num_cores` / `-num_cores`: Number of CPU cores to use for parallel processing (default: `1`)

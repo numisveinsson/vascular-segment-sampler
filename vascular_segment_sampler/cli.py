@@ -22,7 +22,7 @@ def sample_main(argv=None) -> None:
         "--config_name",
         type=str,
         default="default_mm",
-        help="Packaged default (default_mm, default_cm, default_mm_coronary), a YAML name under config/, or a file path",
+        help="Packaged default (default_mm, default_cm, test.yml), a YAML name under config/, or a file path",
     )
     parser.add_argument(
         "-perc_dataset", "--perc_dataset", default=1.0, type=float, help="Fraction of dataset"
