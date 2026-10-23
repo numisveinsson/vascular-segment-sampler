@@ -15,6 +15,7 @@ from vascular_segment_sampler.sitk_functions import (
 from vtk.util.numpy_support import vtk_to_numpy as v2n
 
 import time
+from tqdm import tqdm
 np.random.seed(0)
 random.seed(0)
 
@@ -47,13 +48,20 @@ def print_info_file(global_config, cases, testing_samples, info_file_name):
         f.close()
 
 
+def _mkdir(path):
+    """Create a directory. An existing path is expected on re-runs."""
+    try:
+        os.mkdir(path)
+    except FileExistsError:
+        return
+    except Exception as e:
+        tqdm.write(str(e))
+
+
 def create_directories(output_folder, modality, global_config):
 
     # create out folder if it doesnt exist
-    try:
-        os.mkdir(output_folder)
-    except Exception as e:
-        print(e)
+    _mkdir(output_folder)
 
     suffix = global_config.get('OUTPUT_SUFFIX', '')
 
@@ -66,37 +74,22 @@ def create_directories(output_folder, modality, global_config):
 
     if global_config['WRITE_IMG']:
         for fn in fns:
-            try:
-                os.mkdir(output_folder+modality+fn+suffix)
-            except Exception as e: print(e)
-            try:
-                os.mkdir(output_folder+modality+fn+suffix+'_masks')
-            except Exception as e: print(e)
+            _mkdir(output_folder+modality+fn+suffix)
+            _mkdir(output_folder+modality+fn+suffix+'_masks')
 
     if global_config['WRITE_VTK']:
-        try:
-            os.mkdir(output_folder+'vtk_data'+suffix)
-        except Exception as e: print(e)
+        _mkdir(output_folder+'vtk_data'+suffix)
 
     if global_config['WRITE_SURFACE']:
         for fn in fns:
-            try:
-                os.mkdir(output_folder+modality+fn+suffix+'_masks_surfaces')
-            except Exception as e: print(e)
-            # try:
-            #     os.mkdir(output_folder+modality+fn+'_masks_surfaces_box')
-            # except Exception as e: print(e)
+            _mkdir(output_folder+modality+fn+suffix+'_masks_surfaces')
     if global_config['WRITE_CENTERLINE']:
         for fn in fns:
-            try:
-                os.mkdir(output_folder+modality+fn+suffix+'_masks_centerlines')
-            except Exception as e: print(e)
+            _mkdir(output_folder+modality+fn+suffix+'_masks_centerlines')
     if global_config['WRITE_OUTLET_STATS']:
         for fn in fns:
-            try:
-                os.mkdir(output_folder+modality+fn+suffix+'_img_outlet_detection')
-                os.mkdir(output_folder+modality+fn+suffix+'_masks_img_outlet_detection')
-            except Exception as e: print(e)
+            _mkdir(output_folder+modality+fn+suffix+'_img_outlet_detection')
+            _mkdir(output_folder+modality+fn+suffix+'_masks_img_outlet_detection')
 
 
 def create_vtk_dir(output_folder, case_name, throwout=0.0, suffix=''):
@@ -239,7 +232,7 @@ def sort_centerline(centerline, sub_divide=1, debug=False):
         # centerline hasnt been processed
         cent_ids = get_point_ids_no_post_proc(centerline)
         bifurc_id = np.zeros(num_points)
-        print("Warning: Centerline has not been processed, no known bifurcations")
+        tqdm.write("Warning: Centerline has not been processed, no known bifurcations")
 
     # print(f"Number of branches: {len(cent_ids)}")
     # # remove identical centerlines
@@ -260,7 +253,7 @@ def sort_centerline(centerline, sub_divide=1, debug=False):
     if check_duplicates:
         if np.unique(c_loc, axis=0).shape[0] != c_loc.shape[0]:
             # remove duplicate points
-            print("\nCenterline has duplicate points, removing them\n")
+            tqdm.write("\nCenterline has duplicate points, removing them\n")
             _, unique_ids = np.unique(c_loc, axis=0, return_index=True)
             # same for cent_ids, but keep same order
             cent_ids_new = []
@@ -270,8 +263,6 @@ def sort_centerline(centerline, sub_divide=1, debug=False):
                     if cent_ids[i][j] in unique_ids:
                         cent_ids_new[i].append(cent_ids[i][j])
             cent_ids = cent_ids_new
-    else:
-        print("Warning: Centerline has not been checked for duplicate points")
 
     num_cent = len(cent_ids)
     # print(f"Num branches {num_cent}, Num points: {num_points}")
@@ -417,7 +408,7 @@ def get_point_ids_no_post_proc(centerline_poly):
                 point_ids.append(point_id)
             point_ids_list.append(point_ids)
         else:
-            print(f"Cell {i} is not a line")
+            tqdm.write(f"Cell {i} is not a line")
 
     return point_ids_list
 
@@ -779,7 +770,7 @@ def extract_surface(img, surface, center, size):
     return stats, surface_local_box, surface_local_sphere
 
 
-def extract_centerline(img, centerline):
+def extract_centerline(img, centerline, verbose=False):
     """
     Function to cut global centerline
     into a local part
@@ -788,7 +779,8 @@ def extract_centerline(img, centerline):
     vtkimage = exportSitk2VTK(img)
     cent_local = bound_polydata_by_image(vtkimage[0], centerline, 0)
     cent_local = get_largest_connected_polydata(cent_local)
-    print("  Keeping largest connected centerline")
+    if verbose:
+        tqdm.write("  Keeping largest connected centerline")
     point_to_cells, non_connected = connectivity_points(cent_local)
     return stats, cent_local
 
@@ -1052,7 +1044,8 @@ def get_proj_traj(stats,
                   write_rotated_centerline=False,
                   img_size=400,
                   n_slices=10,
-                  return_rot_matrices=False):
+                  return_rot_matrices=False,
+                  verbose=False):
     """
     Function to get the projected trajectory
     of the centerline
@@ -1192,9 +1185,9 @@ def get_proj_traj(stats,
                     if visualize:
                         # visualize the projected points
                         visualize_points(locs_proj, plane, planes_img[i], stats['NAME']+'_'+str(angle_number),
-                                         ip, outdir, split_dirs=split_dirs)
+                                         ip, outdir, split_dirs=split_dirs, verbose=verbose)
                         visualize_points(locs_proj, plane, planes_seg[i], stats['NAME']+'_'+str(angle_number),
-                                         ip, outdir, split_dirs=split_dirs, seg=True)
+                                         ip, outdir, split_dirs=split_dirs, seg=True, verbose=verbose)
                     locs_proj = shift_invert(locs_proj, img_size)
                     assert len(locs_proj) == 20, f"Length of locs_proj is {len(locs_proj)}"
                     for j in range(len(locs_proj)):
@@ -1267,9 +1260,9 @@ def get_proj_traj(stats,
                     if locs_proj_accumulated:
                         locs_proj_accumulated = np.concatenate(locs_proj_accumulated, axis=0)
                     visualize_points(locs_proj_accumulated, plane, planes_img[i], stats['NAME']+'_'+str(angle_number),
-                                    num_cent_plotted, outdir, split_dirs=split_dirs)
+                                    num_cent_plotted, outdir, split_dirs=split_dirs, verbose=verbose)
                     visualize_points(locs_proj_accumulated, plane, planes_seg[i], stats['NAME']+'_'+str(angle_number),
-                                    num_cent_plotted, outdir, split_dirs=split_dirs, seg=True)
+                                    num_cent_plotted, outdir, split_dirs=split_dirs, seg=True, verbose=verbose)
 
     if return_rot_matrices:
         return trajs, num_trajs, rot_matrices
@@ -1433,7 +1426,7 @@ def line_intersects_plane(line_points, plane_point, plane_normal):
 
 
 def visualize_points(locs_proj, plane, planes, name, nr, outdir,
-                     split_dirs=False, seg=False):
+                     split_dirs=False, seg=False, verbose=False):
     """
     Function to visualize the projected points on top of the image.
     All points are shown on one image.
@@ -1509,7 +1502,8 @@ def visualize_points(locs_proj, plane, planes, name, nr, outdir,
     if not split_dirs:
         output_filename = os.path.join(image_out_dir, f"{name}_{nr}_{plane}.jpg")
         cv2.imwrite(output_filename, planes_color)
-        print(f"Image saved to {output_filename}")
+        if verbose:
+            tqdm.write(f"Image saved to {output_filename}")
     else:
         # make dir for nr
         image_out_dir = os.path.join(image_out_dir, f"{nr}")
@@ -1804,10 +1798,7 @@ def find_next_point(count, locs, rads, bifurc, global_config, on_cent):
 
 
 def print_model_info(case_name, N, n_old, M, m_old):
-    print(case_name)
-    print("\n****************** All done for this model! ******************")
-    print("****************** " + str(N-n_old) + " extractions! ******************")
-    print("****************** " + str(M-m_old) + " throwouts! ****************** \n")
+    print(f"{case_name}: {N-n_old} extractions, {M-m_old} throwouts")
 
 
 def print_into_info(info_file_name, case_name, N, n_old, M, m_old, K, k_old,
@@ -1866,12 +1857,15 @@ def write_vtk_throwout(reader_seg, index_extract, size_extract, out_dir,
 
 
 def write_subvolume_img(new_img, removed_seg, image_out_dir, seg_out_dir, case_name, N,
-              n_old, sub, binarize=True):
+              n_old, sub, binarize=True, verbose=False):
     sitk.WriteImage(new_img, image_out_dir + case_name + '_' + str(N-n_old) + '_' + str(sub)+'.nii.gz')
     max_seg_value = sitk.GetArrayFromImage(removed_seg).max()
     if max_seg_value != 1 and binarize:
         removed_seg = removed_seg / float(max_seg_value*1.0)
-        print(f"Max seg value after scaling: {sitk.GetArrayFromImage(removed_seg).max()}")
+        if verbose:
+            tqdm.write(
+                f"Max seg value after scaling: {sitk.GetArrayFromImage(removed_seg).max()}"
+            )
 
     # make image unsigned int, removed_seg is sitk image
     removed_seg = sitk.Cast(removed_seg, sitk.sitkUInt8)
@@ -2003,7 +1997,6 @@ def print_csv_stats(out_dir, global_config, modality):
     else:
         csv_file = modality + '_train'+suffix+csv_file
 
-    print("Here come some AVG stats for the samples")
     # Calculate avg GT mean and std
     with open(out_dir+csv_file, 'r') as f:
         reader = csv.DictReader(f)

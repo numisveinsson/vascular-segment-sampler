@@ -19,7 +19,7 @@ from vascular_segment_sampler.sampling.functions import (
     create_base_stats, add_tangent_stats, extract_centerline,
     discretize_centerline, write_surface, write_centerline, write_csv,
     write_csv_discrete_cent, write_csv_outlet_stats, write_pkl_outlet_stats,
-    print_model_info, print_info_file, get_cross_sectional_planes,
+    print_info_file, get_cross_sectional_planes,
     print_into_info, print_into_info_all_done,
     append_stats, create_directories, print_csv_stats,
     get_longest_centerline, sort_centerline_by_length, flip_radius,
@@ -37,6 +37,18 @@ start_time = time.time()
 now = datetime.now()
 dt_string = now.strftime("_%d_%m_%Y_%H_%M_%S")
 sys.stdout.flush()
+
+
+def _log(msg, *, verbose_only=False, verbose=False):
+    """Write a line without breaking an active tqdm bar."""
+    if verbose_only and not verbose:
+        return
+    tqdm.write(str(msg))
+
+
+def _sample_case_star(args):
+    return sample_case(*args)
+
 
 def _get_create_seg_surf_mod():
     """Return create_seg_from_surf module (package import)."""
@@ -66,8 +78,13 @@ def _ensure_truth_from_surface(global_config, case_dict):
         os.makedirs(truths_dir, exist_ok=True)
 
     regen = global_config.get('TRUTH_REGENERATE', False)
+    verbose = bool(global_config.get('VERBOSE', False))
     if not regen and os.path.isfile(seg_path):
-        print(f"Using existing segmentation: {seg_path}")
+        _log(
+            f"Using existing segmentation: {seg_path}",
+            verbose_only=True,
+            verbose=verbose,
+        )
         return False
 
     surf_path = resolve_case_surface_path(global_config['DATA_DIR'], case_dict['NAME'])
@@ -88,7 +105,11 @@ def _ensure_truth_from_surface(global_config, case_dict):
         resample_order=3,
     )
     sitk.WriteImage(seg_out, seg_path)
-    print(f"Wrote segmentation from surface: {seg_path}")
+    _log(
+        f"Wrote segmentation from surface: {seg_path}",
+        verbose_only=True,
+        verbose=verbose,
+    )
     return True
 
 
@@ -99,6 +120,7 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
 
     """ Sample a case and write out the results """
 
+    verbose = bool(global_config.get('VERBOSE', False))
     suffix = global_config.get('OUTPUT_SUFFIX', '')
 
     # Check if case is in done.txt
@@ -108,8 +130,8 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
             done = f.read().splitlines()
             f.close()
         if case_fn in done:
-            print(f"Skipping {case_fn}")
-            return (case_fn, [], [], [], [], [], [])
+            _log(f"Skipping {case_fn}", verbose_only=True, verbose=verbose)
+            return (case_fn, [], [], [], [], [], [], [], 0)
 
     if global_config['WRITE_TRAJECTORIES']:
         traj_file = out_dir + "trajectories" + suffix + ".pkl"
@@ -137,9 +159,12 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
     case_dict = get_case_dict_dir(global_config['DATA_DIR'], case_fn,
                                   global_config.get('IMG_EXT'))
 
-    # Print case name and core label
-    print(f"\n I am process {multiprocessing.current_process().name}")
-    print(f"Starting case: {case_dict['NAME']}")
+    _log(
+        f"I am process {multiprocessing.current_process().name}",
+        verbose_only=True,
+        verbose=verbose,
+    )
+    _log(f"Starting case: {case_dict['NAME']}", verbose_only=True, verbose=verbose)
     time_now_case = time.time()
 
     if global_config['WRITE_VTK']:
@@ -147,7 +172,7 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
             create_vtk_dir(out_dir, case_dict['NAME'], global_config['CAPFREE'],
                           suffix=suffix)
         except Exception as e:
-            print(e)
+            _log(e)
 
     # Read Image Metadata (optionally build truths/ from surfaces/ first)
     if global_config.get('SEG_FROM_SURFACE'):
@@ -203,8 +228,12 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
     k_old = K
 
     ip_longest = get_longest_centerline(cent_ids, c_loc)
-    print(f"Case: {case_fn}: Longest centerline is {ip_longest}"
-          + f" with {len(cent_ids[ip_longest])} points")
+    _log(
+        f"Case: {case_fn}: Longest centerline is {ip_longest}"
+        f" with {len(cent_ids[ip_longest])} points",
+        verbose_only=True,
+        verbose=verbose,
+    )
 
     # Sort centerlines by length, starting with longest
     ips_sorted_length = sort_centerline_by_length(cent_ids, c_loc)
@@ -212,10 +241,18 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
     # Make all cent_ids start where the radius is larger
     cent_ids = flip_radius(cent_ids, radii)
 
-    verbose = bool(global_config.get('VERBOSE', False))
+    # Workers leave the bar to the parent process.
+    show_bars = multiprocessing.current_process().name == "MainProcess"
+    cent_bar = tqdm(
+        ips_sorted_length,
+        desc=f"{case_dict['NAME']} centerlines",
+        leave=False,
+        disable=not show_bars,
+    )
+    warned_centerline = False
 
     # Loop over centerlines
-    for ip in tqdm(ips_sorted_length, desc=f"{case_dict['NAME']} centerlines", leave=False):
+    for ip in cent_bar:
         # Choose destination directory
         (image_out_dir, seg_out_dir,
          val_port) = choose_destination(global_config['TESTING'],
@@ -234,25 +271,28 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
         # and bifurcation ids at those locations
         locs, rads, bifurc = c_loc[ids], radii[ids], bifurc_id[ids]
         if len(locs) < 2:
-            print(f"Skipping centerline {ip} for {case_dict['NAME']} (only {len(locs)} point)")
+            _log(
+                f"Skipping centerline {ip} for {case_dict['NAME']}"
+                f" (only {len(locs)} point)"
+            )
             continue
         # Continue taking steps while still on centerline
         on_cent, count = True, 0  # count is the point along centerline
-        print(f"\n--- {case_dict['NAME']} ---")
-        print(f"--- Ip is {ip} / {num_cent} ---\n")
+        _log(f"--- {case_dict['NAME']} ---", verbose_only=True, verbose=verbose)
+        _log(f"--- Ip is {ip} / {num_cent} ---", verbose_only=True, verbose=verbose)
         while on_cent:
             # Only continue if we've not walked this centerline before
             if not (ids[count] in ids_total):
 
                 if verbose:
-                    print('The point # along centerline is ' + str(count))
-                    print('The radius is ' + str(rads[count]))
+                    _log('The point # along centerline is ' + str(count))
+                    _log('The radius is ' + str(rads[count]))
 
                 time_now = time.time()
                 # check if we need to rotate the volume
                 tangent = get_tangent(locs, count)
                 if global_config['ROTATE_VOLUMES']:
-                    print("Rotating volume")
+                    _log("Rotating volume", verbose_only=True, verbose=verbose)
                     (reader_im, reader_seg,
                      origin_im, y_vec, z_vec,
                      rot_matrix) = rotate_volumes(
@@ -295,7 +335,7 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
                     # Continue if surface cap is not present
                     if not is_inside:
                         if verbose:
-                            print("*", end=" ")
+                            _log("*")
                         try:
                             name = (case_dict['NAME']+'_'+str(N-n_old)
                                     + '_'+str(sub))
@@ -387,13 +427,20 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
                                     if global_config['WRITE_CENTERLINE']:
                                         if global_config['EXTRACT_VOLUMES']:
                                             _, new_cent = extract_centerline(
-                                                new_img, global_centerline)
+                                                new_img, global_centerline,
+                                                verbose=verbose)
                                             write_centerline(new_cent,
                                                              seg_out_dir,
                                                              case_dict['NAME'],
                                                              N, n_old, sub)
                                         else:
-                                            print("Warning: WRITE_CENTERLINE requires EXTRACT_VOLUMES to be True, skipping centerline extraction")
+                                            if not warned_centerline:
+                                                _log(
+                                                    "Warning: WRITE_CENTERLINE requires"
+                                                    " EXTRACT_VOLUMES to be True,"
+                                                    " skipping centerline extraction"
+                                                )
+                                                warned_centerline = True
                                 if global_config['EXTRACT_VOLUMES'] and global_config['WRITE_IMG']:
                                     if global_config['RESAMPLE_VOLUMES']:
                                         removed_seg_re = resample_spacing(
@@ -408,13 +455,15 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
                                         write_subvolume_img(new_img_re, removed_seg_re,
                                                   image_out_dir, seg_out_dir,
                                                   case_dict['NAME'],
-                                                  N, n_old, sub, global_config['BINARIZE'])
+                                                  N, n_old, sub, global_config['BINARIZE'],
+                                                  verbose=verbose)
                                     else:
                                         # BINARIZE: Normalize seg values to [0,1] and enforce binary constraint
                                         write_subvolume_img(new_img, removed_seg,
                                                   image_out_dir, seg_out_dir,
                                                   case_dict['NAME'],
-                                                  N, n_old, sub, global_config['BINARIZE'])
+                                                  N, n_old, sub, global_config['BINARIZE'],
+                                                  verbose=verbose)
 
                                 if global_config['EXTRACT_VOLUMES'] and global_config['WRITE_VTK']:
                                     write_vtk(new_img, removed_seg,
@@ -426,7 +475,7 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
                                 _, new_cent = extract_centerline(
                                     new_img,
                                     global_centerline,
-                                    tangent=tangent)
+                                    verbose=verbose)
                                 cent_stats = discretize_centerline(
                                     new_cent,
                                     new_img,
@@ -450,7 +499,12 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
 
                                 total_num_examples_pos += pos_example
                                 total_num_examples += 6
-                                print(f"Ratio of positive examples: {total_num_examples_pos/total_num_examples * 100:.2f}")
+                                _log(
+                                    "Ratio of positive examples: "
+                                    f"{total_num_examples_pos/total_num_examples * 100:.2f}",
+                                    verbose_only=True,
+                                    verbose=verbose,
+                                )
                                 if global_config['WRITE_OUTLET_IMG']:
                                     write_2d_planes(planes, stats_out,
                                                     image_out_dir)
@@ -492,16 +546,19 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
                                     visualize=True,
                                     suffix=suffix,
                                     img_size=global_config['RESAMPLE_CROSS_IMG'],
-                                    n_slices=global_config['N_SLICES'],)
+                                    n_slices=global_config['N_SLICES'],
+                                    verbose=verbose)
 
                         except Exception as e:
-                            print(e)
-                            print("\n*****************************ERROR:\n")
-                            print(" did not save files for " + case_dict['NAME'] + '_' + str(N-n_old)+'_'+str(sub))
+                            _log(e)
+                            _log(
+                                "ERROR: did not save files for "
+                                + case_dict['NAME'] + '_' + str(N-n_old)+'_'+str(sub)
+                            )
                             K += 1
                             # import pdb; pdb.set_trace()
                     else:
-                        print(".", end=" ")
+                        _log(".", verbose_only=True, verbose=verbose)
                         # print(" No save - cap inside")
                         try:
                             if (global_config['WRITE_VTK']
@@ -512,18 +569,33 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
                                                    n_old, sub, suffix=suffix)
                             M += 1
                         except Exception as e:
-                            print(e)
+                            _log(e)
                             # print("\n*****************************ERROR: did not save throwout for " +case_dict['NAME']+'_'+str(N-n_old)+'_'+str(sub))
                             K += 1
                     sub += 1
 
-                print('\n Finished: ' + case_dict['NAME'] + '_' + str(N-n_old))
-                print(f"Time for this point: {(time.time() - time_now):.2f} sec")
+                _log(
+                    'Finished: ' + case_dict['NAME'] + '_' + str(N-n_old),
+                    verbose_only=True,
+                    verbose=verbose,
+                )
+                _log(
+                    f"Time for this point: {(time.time() - time_now):.2f} sec",
+                    verbose_only=True,
+                    verbose=verbose,
+                )
                 # print(" " + str(sub) + " variations")
                 N += 1
+                cent_bar.set_postfix(
+                    saved=N - n_old,
+                    throw=M - m_old,
+                    err=K - k_old,
+                    pt=count,
+                    refresh=False,
+                )
 
                 if N*n_samples - skipped > int(float(global_config['MAX_SAMPLES'])):
-                    print("Max samples reached")
+                    _log("Max samples reached")
                     on_cent = False
                     break
 
@@ -533,12 +605,14 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
         ids_total.extend(ids)
 
         if N*n_samples - skipped > int(float(global_config['MAX_SAMPLES'])):
-            print("Max samples reached")
             break
 
-    print_model_info(case_dict['NAME'],  N, n_old, M, m_old)
-    # info[case_dict['NAME']] = [ N-n_old, M-m_old, K-k_old]
-    print(f"Total time for this case: {(time.time() - time_now_case):.2f} sec")
+    cent_bar.close()
+    elapsed_case = time.time() - time_now_case
+    _log(
+        f"{case_dict['NAME']}: {N-n_old} extractions, {M-m_old} throwouts, "
+        f"{K-k_old} errors, {elapsed_case:.1f}s"
+    )
     print_into_info(info_file_name, case_dict['NAME'], N, n_old, M, m_old, K,
                     k_old, out_dir)
     write_csv(csv_list, csv_list_val, modality, global_config)
@@ -555,7 +629,11 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
 
     # TODO: if trajectories, add to df file
     if global_config['WRITE_TRAJECTORIES']:
-        print(f"Number of trajectories for {case_dict['NAME']}: {num_trajs}")
+        _log(
+            f"Number of trajectories for {case_dict['NAME']}: {num_trajs}",
+            verbose_only=True,
+            verbose=verbose,
+        )
         column_names = ['frame', 'trackId', 'x', 'y', 'sceneId', 'metaId']
         # check if files exist
         if os.path.exists(traj_file):
@@ -568,7 +646,8 @@ def sample_case(case_fn, global_config, out_dir, image_out_dir_train,
 
         # test read in
         df = pd.read_pickle(traj_file)
-        print(df[df['metaId'] == 0])
+        if verbose:
+            _log(df[df['metaId'] == 0])
 
     # write to done.txt the name of the case
     with open(done_file, "a") as f:
@@ -670,7 +749,10 @@ def extract_patches(
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
-    for modality_name in tqdm(modalities, desc="Modalities"):
+    modality_iter = (
+        tqdm(modalities, desc="Modalities") if len(modalities) > 1 else modalities
+    )
+    for modality_name in modality_iter:
         cases = create_dataset(global_config, modality_name)
 
         random.seed(42)
@@ -683,12 +765,12 @@ def extract_patches(
             cases = cases[start_from:]
 
         done_file_path = out_dir + "done" + output_suffix + ".txt"
+        done_names = set()
         if os.path.exists(done_file_path):
             with open(done_file_path, "r") as f:
-                done = f.read().splitlines()
-            for case in done:
-                print(f"Skipping {case}")
-            cases = [case for case in cases if case not in done]
+                done_names = {line for line in f.read().splitlines() if line}
+        n_done = sum(1 for case in cases if case in done_names)
+        cases = [case for case in cases if case not in done_names]
 
         modality_l = modality_name.lower()
         suffix = output_suffix
@@ -705,45 +787,51 @@ def extract_patches(
 
         N, M, K, O = 0, 0, 0, 0
 
-        print(f"\n--- {modality_l} ---")
-        print(f"--- {len(cases)} cases ---")
-        for i in cases:
-            print(f"Case: {i}")
+        _log(f"{modality_l}: {len(cases)} cases ({n_done} already done)")
+        if verbose:
+            for case in cases:
+                _log(f"Case: {case}")
 
         if cases and not yes and not io.prompt_continue("Wish to continue? [y/n]: "):
-            print("Aborting before starting first case.")
+            _log("Aborting before starting first case.")
             continue
 
         print_info_file(global_config, cases, global_config["TEST_CASES"], info_file_name)
 
-        num_cores_pos = multiprocessing.cpu_count()
-        print(f"Number of possible cores: {num_cores_pos}")
+        _log(
+            f"Number of possible cores: {multiprocessing.cpu_count()}",
+            verbose_only=True,
+            verbose=verbose,
+        )
 
         if num_cores > 1:
-            pool = multiprocessing.Pool(num_cores)
-            results = [
-                pool.apply_async(
-                    sample_case,
-                    args=(
-                        case,
-                        global_config,
-                        out_dir,
-                        image_out_dir_train,
-                        seg_out_dir_train,
-                        image_out_dir_val,
-                        seg_out_dir_val,
-                        image_out_dir_test,
-                        seg_out_dir_test,
-                        info_file_name,
-                        modality_l,
-                    ),
+            sample_args = [
+                (
+                    case,
+                    global_config,
+                    out_dir,
+                    image_out_dir_train,
+                    seg_out_dir_train,
+                    image_out_dir_val,
+                    seg_out_dir_val,
+                    image_out_dir_test,
+                    seg_out_dir_test,
+                    info_file_name,
+                    modality_l,
                 )
                 for case in cases
             ]
-            pool.close()
-            pool.join()
+            results = []
+            with multiprocessing.Pool(num_cores) as pool:
+                with tqdm(
+                    total=len(cases), desc=f"{modality_l} cases", leave=True
+                ) as case_bar:
+                    for result in pool.imap_unordered(_sample_case_star, sample_args):
+                        results.append(result)
+                        case_bar.set_postfix(last=result[0], refresh=False)
+                        case_bar.update(1)
         else:
-            for case in tqdm(cases, desc=f"{modality_l} cases", leave=False):
+            for case in tqdm(cases, desc=f"{modality_l} cases", leave=True):
                 results = sample_case(
                     case,
                     global_config,
@@ -792,9 +880,9 @@ def extract_patches(
         print_into_info_all_done(
             info_file_name, N, M, K, O, out_dir, start_time=start_time
         )
-        print(f"\n--- {(time.time() - start_time)/60:.2f} min ---")
-        print(f"--- {(time.time() - start_time)/3600:.2f} hours ---")
+        elapsed = time.time() - start_time
+        _log(f"--- {elapsed/60:.2f} min ({elapsed/3600:.2f} hours) ---")
         print_csv_stats(out_dir, global_config, modality_l)
 
-    print("All done")
+    _log("All done")
     return out_dir

@@ -37,10 +37,7 @@ def _resolve_volume_path(directory, subdir, model, img_ext=None):
 def create_dataset(global_config, modality):
 
     dataset_name = global_config['DATASET_NAME']
-    print(f'Reading in dataset')
-    print(f'Make sure the dataset is in the correct directory: {global_config["DATA_DIR"]}\n')
-    print(f'Dataset name: {dataset_name}')
-    print(f'Subfolders need to be:\n images\n truths\n surfaces\n centerlines')
+    verbose = bool(global_config.get('VERBOSE', False))
 
     test_cases = global_config.get('TEST_CASES') or []
     bad_cases = global_config.get('BAD_CASES') or []
@@ -53,15 +50,17 @@ def create_dataset(global_config, modality):
             global_config['ANATOMY'],
             image_modalities=img_mods,
         )
-        cases = Dataset.sort_cases(global_config['TESTING'], test_cases)
-        cases = Dataset.check_which_cases_in_image_dir(cases)
+        cases = Dataset.sort_cases(global_config['TESTING'], test_cases, verbose=verbose)
+        cases = Dataset.check_which_cases_in_image_dir(cases, verbose=verbose)
         cases = [f for f in cases if f not in bad_cases]
+        print(f"Found {len(cases)} cases")
     elif dataset_name == 'other':
         cases = get_dataset_cases(
             global_config['DATA_DIR'],
             global_config.get('IMG_EXT'),
             test_cases,
             global_config['TESTING'],
+            verbose=verbose,
         )
     else:
         print("Dataset not found")
@@ -70,7 +69,7 @@ def create_dataset(global_config, modality):
     return cases
 
 
-def get_dataset_cases(directory, img_ext=None, test_cases=None, testing=False):
+def get_dataset_cases(directory, img_ext=None, test_cases=None, testing=False, verbose=False):
 
     """
     Returns a list of cases in the dataset
@@ -88,20 +87,15 @@ def get_dataset_cases(directory, img_ext=None, test_cases=None, testing=False):
         cid = _case_id_from_volume_filename(f, img_ext)
         if cid is not None:
             cases_im.append(cid)
-    if img_ext:
-        print(f"Found {len(cases_im)} images with extension {img_ext}")
-    else:
-        print(f"Found {len(cases_im)} images")
-
     cases_cent = []
     for f in os.listdir(os.path.join(directory, 'centerlines')):
         # Skip AppleDouble / hidden files (``._case.vtp``). They are not cases.
         if f.startswith('.') or not f.endswith('.vtp'):
             continue
         cases_cent.append(f[: -len('.vtp')])
-    print(f"Found {len(cases_cent)} centerlines")
 
     # if surface folder exists
+    n_surf = None
     if os.path.exists(os.path.join(directory, 'surfaces')):
         cases_surf = []
         for f in os.listdir(os.path.join(directory, 'surfaces')):
@@ -111,16 +105,16 @@ def get_dataset_cases(directory, img_ext=None, test_cases=None, testing=False):
             if stem.endswith('.seg'):
                 stem = stem[: -len('.seg')]
             cases_surf.append(stem)
-        print(f"Found {len(cases_surf)} surfaces")
-    else:
-        print("No surfaces found")
-        cases_surf = []
+        n_surf = len(cases_surf)
+    surf_bit = f", {n_surf} surfaces" if n_surf is not None else ""
 
     if testing:
         test_cases_w_img = [f for f in test_cases if f in cases_im]
-        print(f"Found {len(test_cases_w_img)} test cases in cases dataset, returning them")
-        # sort
         test_cases_w_img.sort()
+        print(
+            f"Found {len(cases_im)} images, {len(cases_cent)} centerlines{surf_bit}, "
+            f"{len(test_cases_w_img)} test cases"
+        )
         return test_cases_w_img
     else:
         # Image and centerline must share a stem. Extra .vtp files (and
@@ -129,19 +123,22 @@ def get_dataset_cases(directory, img_ext=None, test_cases=None, testing=False):
         cent_set = set(cases_cent)
         im_set = set(cases_im)
         cases = [f for f in cases_im if f in cent_set and f not in test_cases]
-        print(f"Found {len(cases)} training cases with image and centerline")
         images_without_cent = sorted(im_set - cent_set)
         cents_without_image = sorted(cent_set - im_set)
-        if images_without_cent:
-            print("Images with no centerline (skipped):")
-            print(images_without_cent)
-        if cents_without_image:
-            print("Centerlines with no image (skipped):")
-            print(cents_without_image)
+        if verbose:
+            if images_without_cent:
+                print("Images with no centerline (skipped):")
+                print(images_without_cent)
+            if cents_without_image:
+                print("Centerlines with no image (skipped):")
+                print(cents_without_image)
         test_cases_removed = sorted(im_set & cent_set & set(test_cases))
-        print(f"Found {len(test_cases_removed)} test cases, removing them")
         cases.sort()
-        print(f"Returning {len(cases)} cases")
+        removed = f", {len(test_cases_removed)} test removed" if test_cases_removed else ""
+        print(
+            f"Found {len(cases_im)} images, {len(cases_cent)} centerlines{surf_bit}, "
+            f"{len(cases)} paired{removed}"
+        )
         return cases
 
 class VMR_dataset:
@@ -177,7 +174,7 @@ class VMR_dataset:
         if anatomy is not None:
             self.df = get_vmr_names_anatomy(self.df, anatomy)
 
-    def sort_cases(self, testing, test_cases):
+    def sort_cases(self, testing, test_cases, verbose=False):
         """
         Sort the cases into train+val and test
         Input: test_cases (list of str)
@@ -191,11 +188,12 @@ class VMR_dataset:
             cases = [f for f in self.df['Legacy Name'].values if f in test_cases]
 
         self.cases = cases
-        print(f"Cases found from url: {cases}")
+        if verbose:
+            print(f"Cases found from url: {cases}")
 
         return cases
     
-    def check_which_cases_in_image_dir(self, cases_list):
+    def check_which_cases_in_image_dir(self, cases_list, verbose=False):
         """
         Check which cases are in the data directory (Images)
         """
@@ -209,11 +207,14 @@ class VMR_dataset:
 
         cases = [f for f in cases_list if f in images]
 
-        # print the cases not in image dir
-        print('Cases not in image dir:')
         imgs_mis = [f for f in cases_list if f not in images]
-        for img in imgs_mis:
-            print(img)
+        if imgs_mis:
+            if verbose:
+                print('Cases not in image dir:')
+                for img in imgs_mis:
+                    print(img)
+            else:
+                print(f"Cases not in image dir: {len(imgs_mis)}")
 
         return cases
 
